@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="智策 - 基于多智能体LLM的A股投资决策分析平台">
+<title>智策 · A股多智能体分析终端</title>
+<script src="/static/marked.min.js"></script>
+<script src="/static/purify.min.js"></script>
+<style>
+:root {
+  --bg: #060912;
+  --bg-1: #0B1120;
+  --bg-2: #111B2E;
+  --bg-3: #16223A;
+  --border: rgba(56, 82, 130, 0.35);
+  --border-hi: rgba(86, 128, 200, 0.5);
+  --text: #DDE6F3;
+  --text-dim: #8EA0BE;
+  --text-mute: #54637E;
+  --accent: #00D4FF;
+  --accent-glow: rgba(0, 212, 255, 0.12);
+  --accent-dim: #0098B8;
+  --gold: #F0B90B;
+  --gold-soft: rgba(240, 185, 11, 0.08);
+  --red: #FF4D6A;
+  --red-soft: rgba(255, 77, 106, 0.08);
+  --green: #2DD4A8;
+  --green-soft: rgba(45, 212, 168, 0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow: 0 8px 32px -12px rgba(0,0,0,0.6), 0 2px 8px -2px rgba(0,0,0,0.3);
+  --shadow-hi: 0 12px 40px -8px rgba(0, 212, 255, 0.08), 0 4px 12px -4px rgba(0,0,0,0.4);
+  --mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select { font-family: inherit; }
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(56, 82, 130, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 82, 130, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 36px 80px;
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  animation: fadeIn 0.6s var(--ease) 0.1s forwards;
+}
+@keyframes fadeIn { to { opacity: 1; } }
+
+/* ═══ Header ═══ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent) 0%, #0098B8 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1rem; color: var(--bg);
+  box-shadow: 0 4px 16px -4px var(--accent-glow);
+  flex-shrink: 0;
+}
+.brand h1 {
+  font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #E2E8F0 0%, #8EA0BE 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.tag {
+  font-size: 0.72rem; color: var(--accent);
+  padding: 3px 10px; border-radius: 20px;
+  background: var(--accent-glow);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  font-weight: 500; letter-spacing: 0.02em;
+}
+
+.search-bar {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1; max-width: 640px; min-width: 280px;
+}
+.search-wrap { position: relative; flex: 1; }
+.search-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--text-mute); display: flex; pointer-events: none;
+}
+.search-input {
+  width: 100%; padding: 10px 14px 10px 40px;
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-size: 0.86rem; outline: none;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.search-input::placeholder { color: var(--text-mute); }
+.search-input:focus { border-color: var(--accent-dim); box-shadow: 0 0 0 3px var(--accent-glow); }
+.search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); max-height: 280px; overflow-y: auto;
+  display: none; z-index: 50; box-shadow: var(--shadow);
+}
+.search-results.show { display: block; }
+.search-result-item {
+  padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+  cursor: pointer; transition: background 0.15s;
+  border-bottom: 1px solid rgba(56, 82, 130, 0.2);
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: var(--bg-3); }
+.search-result-item .code { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); min-width: 64px; }
+.search-result-item .name { font-size: 0.84rem; color: var(--text); flex: 1; }
+.search-result-item .market { font-size: 0.7rem; color: var(--text-mute); }
+.date-input {
+  padding: 10px 12px; background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-size: 0.82rem;
+  outline: none; transition: border-color 0.2s; color-scheme: dark;
+}
+.date-input:focus { border-color: var(--accent-dim); }
+.analyze-btn {
+  padding: 10px 22px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+  color: var(--bg); font-weight: 600; font-size: 0.84rem;
+  border-radius: var(--radius-sm); transition: all 0.2s var(--ease);
+  white-space: nowrap; letter-spacing: 0.01em;
+}
+.analyze-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px -6px var(--accent-glow); }
+.analyze-btn:active:not(:disabled) { transform: translateY(0); }
+.analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.config-toggle {
+  padding: 8px 16px; background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-dim);
+  font-size: 0.78rem; font-weight: 500; transition: all 0.2s; white-space: nowrap;
+}
+.config-toggle:hover { border-color: var(--accent-dim); color: var(--accent); }
+.config-toggle.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+/* ═══ Model Config Panel ═══ */
+.model-config {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 24px;
+  display: none; overflow: hidden;
+}
+.model-config.show { display: block; animation: slideDown 0.3s var(--ease); }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+.mc-header {
+  padding: 16px 20px; background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.mc-header h3 { font-size: 0.9rem; font-weight: 600; letter-spacing: -0.01em; }
+.mc-header .hint { font-size: 0.72rem; color: var(--text-mute); margin-left: auto; }
+
+.mc-body { padding: 20px; display: grid; gap: 20px; }
+
+/* Model list */
+.mc-section-title {
+  font-size: 0.78rem; color: var(--text-dim); font-weight: 600;
+  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.mc-section-title .hint { font-size: 0.68rem; color: var(--text-mute); font-weight: 400; }
+
+.mc-model-list { display: grid; gap: 10px; }
+
+.mc-model-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s;
+}
+.mc-model-item:hover { border-color: var(--border-hi); }
+.mc-model-item .mi-info { display: flex; flex-direction: column; gap: 2px; }
+.mc-model-item .mi-name { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+.mc-model-item .mi-id { font-size: 0.66rem; font-family: var(--mono); color: var(--text-mute); }
+.mc-model-item .mi-key {
+  font-size: 0.68rem; font-family: var(--mono); color: var(--text-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mc-model-item .mi-url {
+  font-size: 0.68rem; font-family: var(--mono); color: var(--text-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mc-model-item .mi-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.mc-btn-icon {
+  width: 30px; height: 30px; border-radius: var(--radius-xs);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.82rem; transition: all 0.2s; border: 1px solid var(--border);
+  background: var(--bg-1); color: var(--text-dim);
+}
+.mc-btn-icon:hover { border-color: var(--border-hi); color: var(--text); }
+.mc-btn-icon.test:hover { border-color: var(--accent); color: var(--accent); }
+.mc-btn-icon.delete:hover { border-color: var(--red); color: var(--red); }
+.mc-btn-icon.testing { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.mc-model-item.default-model { border-color: var(--accent-dim); background: var(--accent-glow); }
+.mc-model-item.default-model .mi-name::after {
+  content: '默认'; font-size: 0.58rem; padding: 1px 5px; border-radius: 8px;
+  background: var(--accent); color: var(--bg); margin-left: 6px; vertical-align: middle; font-weight: 600;
+}
+
+/* Add model form */
+.mc-add-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+  padding: 16px;
+  background: var(--bg-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+.mc-add-form .mc-field { display: flex; flex-direction: column; gap: 4px; }
+.mc-add-form .mc-field label {
+  font-size: 0.62rem; color: var(--text-mute);
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+}
+.mc-add-form input, .mc-add-form select {
+  padding: 8px 10px; background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); color: var(--text); font-size: 0.76rem;
+  outline: none; transition: border-color 0.2s;
+}
+.mc-add-form input:focus, .mc-add-form select:focus { border-color: var(--accent-dim); }
+.mc-add-form input::placeholder { color: var(--text-mute); }
+
+.mc-template-select {
+  padding: 8px 10px; background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); color: var(--text-dim); font-size: 0.74rem;
+  outline: none; cursor: pointer; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2354637E' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 6px center; padding-right: 24px;
+}
+.mc-template-select option { background: var(--bg-2); }
+
+.mc-btn {
+  padding: 8px 18px; border-radius: var(--radius-sm);
+  font-size: 0.78rem; font-weight: 500; transition: all 0.2s;
+}
+.mc-btn-add {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+  color: var(--bg); font-weight: 600; white-space: nowrap;
+}
+.mc-btn-add:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -4px var(--accent-glow); }
+.mc-btn-add:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* Default model selection */
+.mc-defaults {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  padding-top: 16px; border-top: 1px solid var(--border);
+}
+.mc-field { display: flex; flex-direction: column; gap: 6px; }
+.mc-field label {
+  font-size: 0.7rem; color: var(--text-mute);
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+}
+.mc-field label .badge {
+  display: inline-block; font-size: 0.62rem; padding: 1px 6px;
+  border-radius: 10px; margin-left: 6px; vertical-align: middle;
+}
+.mc-field label .badge.deep { color: var(--gold); background: var(--gold-soft); border: 1px solid rgba(240,185,11,0.15); }
+.mc-field label .badge.quick { color: var(--accent); background: var(--accent-glow); border: 1px solid rgba(0,212,255,0.15); }
+.mc-select {
+  padding: 9px 12px; background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-size: 0.82rem;
+  outline: none; transition: border-color 0.2s; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238EA0BE' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; cursor: pointer;
+}
+.mc-select:focus { border-color: var(--accent-dim); }
+.mc-select option { background: var(--bg-2); color: var(--text); }
+
+/* Per-role overrides */
+.mc-per-role { border-top: 1px solid var(--border); padding-top: 20px; }
+.mc-role-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.mc-role-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); transition: border-color 0.2s;
+}
+.mc-role-item:hover { border-color: var(--border-hi); }
+.mc-role-item .emoji { font-size: 0.95rem; flex-shrink: 0; }
+.mc-role-item .name { font-size: 0.78rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; }
+.mc-role-item select {
+  flex: 1; padding: 6px 26px 6px 8px; background: var(--bg-1);
+  border: 1px solid var(--border); border-radius: var(--radius-xs);
+  color: var(--text); font-size: 0.74rem; outline: none;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2354637E' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 6px center; cursor: pointer;
+}
+.mc-role-item select:focus { border-color: var(--accent-dim); }
+.mc-role-item select option { background: var(--bg-2); }
+
+.mc-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding-top: 16px; border-top: 1px solid var(--border);
+}
+.mc-btn-save { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%); color: var(--bg); font-weight: 600; }
+.mc-btn-save:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -4px var(--accent-glow); }
+.mc-btn-reset { background: var(--bg-2); border: 1px solid var(--border); color: var(--text-dim); }
+.mc-btn-reset:hover { border-color: var(--border-hi); color: var(--text); }
+
+/* Test result toast */
+.mc-toast {
+  position: fixed; bottom: 24px; right: 24px;
+  padding: 12px 20px; border-radius: var(--radius-sm);
+  font-size: 0.8rem; font-weight: 500; z-index: 9999;
+  box-shadow: var(--shadow); animation: toastIn 0.3s var(--ease);
+  max-width: 420px;
+}
+.mc-toast.success { background: var(--green-soft); border: 1px solid rgba(45, 212, 168, 0.3); color: var(--green); }
+.mc-toast.error { background: var(--red-soft); border: 1px solid rgba(255, 77, 106, 0.3); color: var(--red); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ═══ Status Bar ═══ */
+.status-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 20px; font-size: 0.82rem;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-mute); flex-shrink: 0; transition: all 0.3s; }
+.status-bar.running .status-dot { background: var(--accent); animation: pulse-dot 2s var(--ease) infinite; }
+.status-bar.done .status-dot { background: var(--green); box-shadow: 0 0 8px rgba(45, 212, 168, 0.4); }
+.status-bar.error .status-dot { background: var(--red); box-shadow: 0 0 8px rgba(255, 77, 106, 0.4); }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.status-text { color: var(--text-dim); }
+.status-text strong { color: var(--text); font-weight: 600; }
+.step-counter {
+  margin-left: auto; font-family: var(--mono); color: var(--accent);
+  font-size: 0.74rem; font-weight: 500; padding: 3px 10px;
+  background: var(--accent-glow); border-radius: 20px; border: 1px solid rgba(0, 212, 255, 0.1);
+}
+
+/* ═══ Pipeline Layout (取代 Cards Grid) ═══ */
+.pipeline {
+  display: flex; flex-direction: column;
+  margin-bottom: 24px; position: relative;
+}
+/* 左侧垂直轨道线 */
+.pipeline::before {
+  content: ''; position: absolute;
+  left: 30px; top: 0; bottom: 0;
+  width: 2px; background: var(--border);
+  z-index: 0;
+}
+.pipeline::after {
+  content: ''; position: absolute;
+  left: 30px; top: 0;
+  width: 2px; height: 0;
+  background: linear-gradient(180deg, var(--accent-dim), var(--accent));
+  z-index: 0; transition: height 1s var(--ease);
+}
+.pipeline.running::after { height: 100%; }
+
+.stage-group {
+  position: relative; z-index: 1;
+  padding-left: 56px; margin-bottom: 6px;
+}
+.stage-group:last-child { margin-bottom: 0; }
+
+/* 阶段节点 - 左侧圆点 */
+.stage-node {
+  position: absolute; left: 18px; top: 20px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--bg-2); border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; transition: all 0.4s var(--ease);
+  z-index: 2;
+}
+.stage-group.active .stage-node {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow);
+  animation: pulse 2.5s var(--ease) infinite;
+}
+.stage-group.completed .stage-node {
+  border-color: var(--accent-dim);
+  background: rgba(0, 152, 184, 0.15);
+}
+.stage-group.current .stage-node {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow), 0 0 16px var(--accent-glow);
+  animation: pulse 2.5s var(--ease) infinite;
+}
+
+/* 阶段容器 */
+.stage-container {
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  transition: all 0.3s var(--ease);
+}
+.stage-container:hover { border-color: var(--border-hi); }
+.stage-group.active .stage-container { border-color: var(--border-hi); box-shadow: var(--shadow-hi); }
+.stage-group.completed .stage-container { opacity: 0.82; }
+
+/* 阶段头部 */
+.stage-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; background: var(--bg-2);
+  border-bottom: 1px solid var(--border); cursor: default;
+}
+.stage-emoji { font-size: 1rem; }
+.stage-title { font-size: 0.86rem; font-weight: 600; color: var(--text); letter-spacing: -0.01em; }
+.stage-arrow {
+  font-size: 0.72rem; color: var(--text-mute); margin-left: 8px;
+  display: flex; align-items: center; gap: 4px;
+}
+.stage-arrow .arrow-svg { opacity: 0.5; }
+.stage-step {
+  margin-left: auto; font-family: var(--mono); font-size: 0.64rem; color: var(--text-mute);
+  padding: 2px 8px; background: var(--bg-3); border-radius: 10px;
+}
+.stage-status {
+  font-size: 0.66rem; padding: 2px 9px; border-radius: 20px; font-weight: 500;
+  margin-left: 8px;
+}
+.stage-status.waiting { color: var(--text-mute); background: rgba(255,255,255,0.03); }
+.stage-status.running { color: var(--accent); background: var(--accent-glow); }
+.stage-status.done { color: var(--green); background: var(--green-soft); }
+
+/* 阶段体 - 内部代理卡片网格 */
+.stage-body {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px; padding: 14px 16px;
+}
+/* 前排分析阶段：4个agent，每行最多2个 */
+.stage-group[data-stage="analysts"] .stage-body {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* 代理卡片 (within stage) */
+.agent-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); overflow: hidden;
+  display: flex; flex-direction: column; transition: all 0.3s var(--ease);
+  position: relative;
+}
+.agent-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: transparent; transition: background 0.3s; }
+.agent-card.active { border-color: var(--border-hi); }
+.agent-card.active::before { background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+.agent-card.completed { opacity: 0.78; }
+.agent-card.completed::before { background: var(--accent-dim); opacity: 0.4; }
+
+.ac-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.ac-emoji { font-size: 0.9rem; }
+.ac-title { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+.ac-model-badge {
+  font-size: 0.6rem; font-family: var(--mono); color: var(--text-mute);
+  padding: 2px 6px; background: rgba(255,255,255,0.03); border-radius: 4px;
+  max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ac-step { margin-left: auto; font-family: var(--mono); font-size: 0.62rem; color: var(--text-mute); }
+.ac-status { font-size: 0.64rem; padding: 1px 8px; border-radius: 20px; font-weight: 500; }
+.ac-status.waiting { color: var(--text-mute); background: rgba(255,255,255,0.03); }
+.ac-status.running { color: var(--accent); background: var(--accent-glow); }
+.ac-status.done { color: var(--green); background: var(--green-soft); }
+
+.agent-tabs {
+  display: flex; gap: 2px; padding: 6px 12px 0;
+  background: transparent; border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.agent-tabs::-webkit-scrollbar { display: none; }
+.agent-tab {
+  padding: 5px 10px; font-size: 0.68rem;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  color: var(--text-mute); cursor: pointer; font-weight: 500;
+  white-space: nowrap; flex-shrink: 0; transition: all 0.2s;
+  margin-bottom: -1px; position: relative;
+}
+.agent-tab.active { color: var(--accent); background: var(--bg-2); border: 1px solid var(--border); border-bottom-color: var(--bg-2); }
+.agent-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); width: 50%; height: 2px; background: var(--accent); border-radius: 2px; }
+.agent-tab:hover:not(.active) { color: var(--text-dim); background: rgba(255,255,255,0.02); }
+
+.ac-body {
+  padding: 10px 12px; flex: 1; overflow-y: auto; max-height: 260px;
+  font-size: 0.78rem; line-height: 1.7; color: var(--text-dim);
+}
+.ac-body::-webkit-scrollbar { width: 4px; }
+.ac-body::-webkit-scrollbar-track { background: transparent; }
+.ac-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.msg-line { padding: 4px 0; border-bottom: 1px solid rgba(56, 82, 130, 0.15); }
+.msg-line:last-child { border-bottom: none; }
+.msg-meta { font-size: 0.64rem; color: var(--text-mute); font-family: var(--mono); margin-bottom: 3px; }
+.msg-content { color: var(--text-dim); }
+
+/* 阶段连接箭头 */
+.stage-connector {
+  position: relative; z-index: 1;
+  height: 28px; margin-left: 56px; display: flex; align-items: center;
+  color: var(--text-mute); font-size: 0.6rem; letter-spacing: 0.06em;
+}
+.stage-connector .connector-line {
+  flex: 1; height: 1px; background: var(--border); margin: 0 6px;
+  transition: background 0.5s;
+}
+.stage-connector.completed .connector-line {
+  background: var(--accent-dim);
+}
+.stage-connector .connector-label {
+  text-transform: uppercase; opacity: 0.6;
+}
+
+/* ═══ Decision Panel ═══ */
+.decision-panel {
+  background: var(--bg-1); border: 1px solid var(--border-hi);
+  border-radius: var(--radius); overflow: hidden; margin-bottom: 24px;
+  display: none; box-shadow: var(--shadow-hi); animation: slideUp 0.5s var(--ease) forwards;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.decision-panel.show { display: block; }
+.decision-header {
+  padding: 20px 24px; background: var(--bg-2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; position: relative; overflow: hidden;
+}
+.decision-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.3; }
+.decision-header h2 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.decision-signal { font-size: 1.3rem; font-weight: 800; padding: 6px 20px; border-radius: var(--radius-sm); margin-left: auto; letter-spacing: 0.03em; }
+.decision-signal.BUY { color: var(--red); background: var(--red-soft); border: 1px solid rgba(255, 77, 106, 0.2); }
+.decision-signal.SELL { color: var(--green); background: var(--green-soft); border: 1px solid rgba(45, 212, 168, 0.2); }
+.decision-signal.HOLD { color: var(--gold); background: var(--gold-soft); border: 1px solid rgba(240, 185, 11, 0.2); }
+.decision-body { padding: 22px 24px; display: grid; grid-template-columns: repeat(3, 1fr) 2fr; gap: 20px 24px; }
+.dmetric { display: flex; flex-direction: column; gap: 4px; }
+.dmetric .label { font-size: 0.66rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500; }
+.dmetric .value { font-size: 1.25rem; font-weight: 700; font-family: var(--mono); color: var(--text); }
+.drationale { grid-column: 4; padding-left: 24px; border-left: 1px solid var(--border); }
+.drationale .label { font-size: 0.66rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; font-weight: 500; }
+.drationale .text { font-size: 0.82rem; color: var(--text-dim); line-height: 1.8; }
+
+/* ═══ Decision Panel ═══ */
+.decision-panel {
+  background: var(--bg-1); border: 1px solid var(--border-hi);
+  border-radius: var(--radius); overflow: hidden; margin-bottom: 24px;
+  display: none; box-shadow: var(--shadow-hi); animation: slideUp 0.5s var(--ease) forwards;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.decision-panel.show { display: block; }
+.decision-header {
+  padding: 20px 24px; background: var(--bg-2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; position: relative; overflow: hidden;
+}
+.decision-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.3; }
+.decision-header h2 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+.decision-signal { font-size: 1.3rem; font-weight: 800; padding: 6px 20px; border-radius: var(--radius-sm); margin-left: auto; letter-spacing: 0.03em; }
+.decision-signal.BUY { color: var(--red); background: var(--red-soft); border: 1px solid rgba(255, 77, 106, 0.2); }
+.decision-signal.SELL { color: var(--green); background: var(--green-soft); border: 1px solid rgba(45, 212, 168, 0.2); }
+.decision-signal.HOLD { color: var(--gold); background: var(--gold-soft); border: 1px solid rgba(240, 185, 11, 0.2); }
+.decision-body { padding: 22px 24px; display: grid; grid-template-columns: repeat(3, 1fr) 2fr; gap: 20px 24px; }
+.dmetric { display: flex; flex-direction: column; gap: 4px; }
+.dmetric .label { font-size: 0.66rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500; }
+.dmetric .value { font-size: 1.25rem; font-weight: 700; font-family: var(--mono); color: var(--text); }
+.drationale { grid-column: 4; padding-left: 24px; border-left: 1px solid var(--border); }
+.drationale .label { font-size: 0.66rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; font-weight: 500; }
+.drationale .text { font-size: 0.82rem; color: var(--text-dim); line-height: 1.8; }
+
+/* ═══ Empty / Error State ═══ */
+.empty-state { text-align: center; padding: 80px 20px 70px; color: var(--text-mute); }
+.empty-state .icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.6; }
+.empty-state h3 { font-size: 1.05rem; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; }
+.empty-state p { font-size: 0.82rem; max-width: 460px; margin: 0 auto; line-height: 1.7; }
+.error-state { background: var(--red-soft); border: 1px solid rgba(255, 77, 106, 0.2); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; display: none; }
+.error-state.show { display: block; }
+.error-state h3 { color: var(--red); font-size: 0.86rem; margin-bottom: 6px; font-weight: 600; }
+.error-state pre { font-size: 0.76rem; color: var(--text-dim); white-space: pre-wrap; line-height: 1.6; }
+
+/* ═══ Markdown ═══ */
+.msg-content { line-height: 1.75; }
+.msg-content h1, .msg-content h2, .msg-content h3, .msg-content h4 { color: var(--text); font-weight: 600; margin: 12px 0 6px; line-height: 1.4; }
+.msg-content h1 { font-size: 1.05rem; }
+.msg-content h2 { font-size: 0.98rem; }
+.msg-content h3 { font-size: 0.9rem; }
+.msg-content h4 { font-size: 0.84rem; }
+.msg-content p { margin: 0 0 6px; }
+.msg-content ul, .msg-content ol { margin: 6px 0; padding-left: 18px; }
+.msg-content li { margin: 3px 0; }
+.msg-content strong { color: var(--text); font-weight: 600; }
+.msg-content em { color: var(--accent); font-style: normal; font-weight: 500; }
+.msg-content code { font-family: var(--mono); font-size: 0.78em; background: rgba(0, 212, 255, 0.06); padding: 2px 5px; border-radius: 4px; color: var(--accent); }
+.msg-content pre { background: rgba(0,0,0,0.25); padding: 10px 12px; border-radius: var(--radius-xs); overflow-x: auto; margin: 8px 0; border: 1px solid var(--border); }
+.msg-content pre code { background: transparent; padding: 0; color: var(--text-dim); }
+.msg-content blockquote { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; background: var(--accent-glow); border-radius: 0 var(--radius-xs) var(--radius-xs) 0; color: var(--text-dim); }
+.msg-content table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.78rem; }
+.msg-content th, .msg-content td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+.msg-content th { background: var(--bg-2); color: var(--text); font-weight: 600; }
+.msg-content hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ═══ Responsive ═══ */
+@media (max-width: 1024px) {
+  .decision-body { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .drationale { grid-column: 1 / -1; padding-left: 0; border-left: none; border-top: 1px solid var(--border); padding-top: 16px; }
+  .mc-defaults { grid-template-columns: 1fr; }
+  .mc-role-grid { grid-template-columns: 1fr; }
+  .mc-model-item { grid-template-columns: 1fr; gap: 6px; }
+  .mc-add-form { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+  .app { padding: 20px 16px 60px; }
+  .header { flex-direction: column; align-items: stretch; gap: 14px; }
+  .search-bar { flex-wrap: wrap; gap: 8px; }
+  .search-wrap { width: 100%; flex: 1; min-width: 200px; }
+  .date-input { width: 130px; }
+  .analyze-btn { margin-left: auto; }
+  .stage-body { grid-template-columns: 1fr; gap: 12px; padding: 10px 12px; }
+  .pipeline::before, .pipeline::after { left: 14px; }
+  .stage-group { padding-left: 36px; }
+  .stage-node { left: 6px; width: 20px; height: 20px; font-size: 0.55rem; top: 16px; }
+  .stage-connector { margin-left: 36px; height: 22px; }
+  .pipeline { gap: 0; }
+  .decision-body { grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px; }
+  .decision-header { padding: 16px 18px; flex-wrap: wrap; gap: 10px; }
+  .decision-signal { margin-left: 0; font-size: 1.15rem; padding: 5px 16px; }
+  .mc-add-form { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-mark">智</div>
+      <h1>智策</h1>
+      <span class="tag">A股多智能体</span>
+    </div>
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+        </span>
+        <input class="search-input" id="searchInput" placeholder="输入股票名称或代码…" autocomplete="off" />
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <input type="date" class="date-input" id="dateInput" />
+      <button class="analyze-btn" id="analyzeBtn" disabled>开始分析</button>
+      <button class="config-toggle" id="configToggle">⚙ 模型配置</button>
+    </div>
+  </div>
+
+  <!-- Model Config Panel -->
+  <div class="model-config" id="modelConfig">
+    <div class="mc-header">
+      <h3>模型配置</h3>
+      <span class="hint">添加模型后可测试连通性 · 第一个模型为默认 · 角色可单独指定</span>
+    </div>
+    <div class="mc-body">
+      <!-- Add Model Form -->
+      <div>
+        <div class="mc-section-title">
+          添加模型
+          <span class="hint">填入 API Key 和 Base URL，点击添加</span>
+        </div>
+        <div class="mc-add-form">
+          <div class="mc-field">
+            <label>快捷选择</label>
+            <select class="mc-template-select" id="tplSelect">
+              <option value="">— 手动输入 —</option>
+            </select>
+          </div>
+          <div class="mc-field">
+            <label>显示名称</label>
+            <input type="text" id="addName" placeholder="如：DeepSeek Chat" />
+          </div>
+          <div class="mc-field">
+            <label>模型 ID</label>
+            <input type="text" id="addModelId" placeholder="如：deepseek-chat" />
+          </div>
+          <div class="mc-field">
+            <label>API Key</label>
+            <input type="password" id="addApiKey" placeholder="sk-..." />
+          </div>
+          <button class="mc-btn mc-btn-add" id="addModelBtn">添加</button>
+        </div>
+        <div class="mc-add-form" style="margin-top:10px; grid-template-columns: 1fr auto;">
+          <div class="mc-field">
+            <label>Base URL</label>
+            <input type="text" id="addBaseUrl" placeholder="https://api.openai.com/v1" />
+          </div>
+          <button class="mc-btn mc-btn-add" id="testModelBtn" style="background:var(--bg-1);border:1px solid var(--border);color:var(--accent);">测试连接</button>
+        </div>
+      </div>
+
+      <!-- Model List -->
+      <div>
+        <div class="mc-section-title">
+          已配置模型
+          <span class="hint">点击测试按钮验证连通性</span>
+        </div>
+        <div class="mc-model-list" id="modelList"></div>
+      </div>
+
+      <!-- Default Model Assignment -->
+      <div class="mc-defaults">
+        <div class="mc-field">
+          <label>默认深度思考模型 <span class="badge deep">辩论裁判 · 风险裁判</span></label>
+          <select class="mc-select" id="defaultDeepModel"><option value="">— 选择 —</option></select>
+        </div>
+        <div class="mc-field">
+          <label>默认快速思考模型 <span class="badge quick">分析师 · 研究员 · 交易员</span></label>
+          <select class="mc-select" id="defaultQuickModel"><option value="">— 选择 —</option></select>
+        </div>
+      </div>
+
+      <!-- Per-Role Overrides -->
+      <div class="mc-per-role">
+        <div class="mc-section-title">
+          角色模型覆盖
+          <span class="hint">留空 = 使用默认模型</span>
+        </div>
+        <div class="mc-role-grid" id="roleModelGrid"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="mc-actions">
+        <button class="mc-btn mc-btn-reset" id="mcReset">重置</button>
+        <button class="mc-btn mc-btn-save" id="mcSave">保存配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar" id="statusBar">
+    <span class="status-dot"></span>
+    <span class="status-text" id="statusText">输入股票代码或名称，选择日期后开始分析</span>
+    <span class="step-counter" id="stepCounter"></span>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-state" id="errorState">
+    <h3>⚠️ 分析出错</h3>
+    <pre id="errorText"></pre>
+  </div>
+
+  <!-- Agent Pipeline -->
+  <div class="pipeline" id="pipeline">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">🤖</div>
+      <h3>等待启动分析</h3>
+      <p>智策将派遣 10 个 AI 分析师，分市场、社交、新闻、基本面四个维度分析你的股票，经过牛熊辩论和风险评估后给出最终交易建议。</p>
+    </div>
+  </div>
+
+  <!-- Decision Panel -->
+  <div class="decision-panel" id="decisionPanel">
+    <div class="decision-header">
+      <h2>最终交易决策</h2>
+      <div class="decision-signal" id="decisionSignal">-</div>
+    </div>
+    <div class="decision-body" id="decisionBody"></div>
+  </div>
+</div>
+
+<script>
+// ═══ State ═══
+let selectedStock = null;
+let eventSource = null;
+let phases = [];
+let totalSteps = 0;
+let cardStates = {};
+let userModels = [];      // 已配置的模型（含 api_key_masked）
+let templates = [];       // 预设模板
+let modelConfig = {
+  defaultDeep: '',
+  defaultQuick: '',
+  roleOverrides: {},
+};
+
+const $ = id => document.getElementById(id);
+const searchInput = $('searchInput');
+const searchResults = $('searchResults');
+const dateInput = $('dateInput');
+const analyzeBtn = $('analyzeBtn');
+const configToggle = $('configToggle');
+const modelConfigEl = $('modelConfig');
+const tplSelect = $('tplSelect');
+const addName = $('addName');
+const addModelId = $('addModelId');
+const addApiKey = $('addApiKey');
+const addBaseUrl = $('addBaseUrl');
+const addModelBtn = $('addModelBtn');
+const testModelBtn = $('testModelBtn');
+const modelList = $('modelList');
+const defaultDeepModel = $('defaultDeepModel');
+const defaultQuickModel = $('defaultQuickModel');
+const roleModelGrid = $('roleModelGrid');
+const statusBar = $('statusBar');
+const statusText = $('statusText');
+const stepCounter = $('stepCounter');
+const pipeline = $('pipeline');
+const emptyState = $('emptyState');
+const errorState = $('errorState');
+const errorText = $('errorText');
+const decisionPanel = $('decisionPanel');
+const decisionSignal = $('decisionSignal');
+const decisionBody = $('decisionBody');
+
+dateInput.value = new Date().toISOString().slice(0, 10);
+
+// ═══ Model Config Panel ═══
+configToggle.addEventListener('click', () => {
+  modelConfigEl.classList.toggle('show');
+  configToggle.classList.toggle('active');
+});
+
+// Template select -> prefill form
+tplSelect.addEventListener('change', () => {
+  const tpl = templates.find(t => t.id === tplSelect.value);
+  if (!tpl) { addName.value = ''; addModelId.value = ''; addBaseUrl.value = ''; return; }
+  addName.value = tpl.name;
+  addModelId.value = tpl.id;
+  addBaseUrl.value = tpl.base_url || '';
+});
+
+// Add model
+addModelBtn.addEventListener('click', async () => {
+  const name = addName.value.trim();
+  const modelId = addModelId.value.trim();
+  const apiKey = addApiKey.value.trim();
+  const baseUrl = addBaseUrl.value.trim();
+  if (!name || !modelId || !apiKey) {
+    showToast('请填写名称、模型 ID 和 API Key', 'error');
+    return;
+  }
+  addModelBtn.disabled = true;
+  addModelBtn.textContent = '添加中…';
+  try {
+    const resp = await fetch('/api/models', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, provider: 'openai', model_id: modelId, api_key: apiKey, base_url: baseUrl }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(`模型 ${name} 已添加`, 'success');
+      addName.value = ''; addModelId.value = ''; addApiKey.value = ''; addBaseUrl.value = '';
+      tplSelect.value = '';
+      await loadModels();
+    } else {
+      showToast(data.error || '添加失败', 'error');
+    }
+  } catch(e) {
+    showToast('请求失败: ' + e.message, 'error');
+  }
+  addModelBtn.disabled = false;
+  addModelBtn.textContent = '添加';
+});
+
+// Test model (from add form)
+testModelBtn.addEventListener('click', async () => {
+  const modelId = addModelId.value.trim();
+  const apiKey = addApiKey.value.trim();
+  const baseUrl = addBaseUrl.value.trim();
+  if (!modelId || !apiKey) {
+    showToast('请先填写模型 ID 和 API Key', 'error');
+    return;
+  }
+  testModelBtn.disabled = true;
+  testModelBtn.textContent = '测试中…';
+  try {
+    const resp = await fetch('/api/models/test', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ model_id: modelId, api_key: apiKey, base_url: baseUrl, provider: 'openai' }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(`✅ ${data.model} 连接成功: ${data.response}`, 'success');
+    } else {
+      showToast(`❌ 连接失败: ${data.error}`, 'error');
+    }
+  } catch(e) {
+    showToast('请求失败: ' + e.message, 'error');
+  }
+  testModelBtn.disabled = false;
+  testModelBtn.textContent = '测试连接';
+});
+
+// Toast
+function showToast(msg, type) {
+  const toast = document.createElement('div');
+  toast.className = `mc-toast ${type}`;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+// Load models from backend
+async function loadModels() {
+  try {
+    const resp = await fetch('/api/models');
+    const data = await resp.json();
+    if (!data.ok) return;
+    userModels = data.models || [];
+    templates = data.templates || [];
+    renderModelList();
+    renderTemplateSelect();
+    renderDefaultSelects(data.phase_tiers || {});
+    renderRoleGrid(data.phase_tiers || {});
+  } catch(e) { console.error('Load models error:', e); }
+}
+
+function renderTemplateSelect() {
+  tplSelect.innerHTML = '<option value="">— 手动输入 —</option>' +
+    templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+}
+
+function renderModelList() {
+  if (!userModels.length) {
+    modelList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-mute);font-size:0.8rem;">暂无配置的模型，请在上方添加</div>';
+    return;
+  }
+  modelList.innerHTML = userModels.map((m, i) => `
+    <div class="mc-model-item ${i === 0 ? 'default-model' : ''}" data-model-id="${m.model_id}">
+      <div class="mi-info">
+        <span class="mi-name">${m.name}</span>
+        <span class="mi-id">${m.model_id}</span>
+      </div>
+      <span class="mi-key" title="${m.api_key_masked}">${m.api_key_masked || '—'}</span>
+      <span class="mi-url" title="${m.base_url}">${m.base_url || '—'}</span>
+      <div class="mi-actions">
+        <button class="mc-btn-icon test" title="测试连通性" onclick="testExistingModel('${m.model_id}')">⚡</button>
+        <button class="mc-btn-icon delete" title="删除" onclick="deleteModel('${m.model_id}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDefaultSelects(phaseTiers) {
+  const opts = userModels.map(m => `<option value="${m.model_id}">${m.name}</option>`).join('');
+  [defaultDeepModel, defaultQuickModel].forEach(sel => {
+    sel.innerHTML = '<option value="">— 选择 —</option>' + opts;
+  });
+  // Restore saved values
+  if (modelConfig.defaultDeep) defaultDeepModel.value = modelConfig.defaultDeep;
+  if (modelConfig.defaultQuick) defaultQuickModel.value = modelConfig.defaultQuick;
+}
+
+function renderRoleGrid(phaseTiers) {
+  const opts = '<option value="">跟随默认</option>' +
+    userModels.map(m => `<option value="${m.model_id}">${m.name}</option>`).join('');
+  roleModelGrid.innerHTML = phases.filter(p => p.id !== 'done').map(p => {
+    const tier = phaseTiers[p.id] || 'quick';
+    const tierLabel = tier === 'deep' ? '深度' : '快速';
+    const saved = modelConfig.roleOverrides[p.id] || '';
+    return `
+      <div class="mc-role-item">
+        <span class="emoji">${p.emoji}</span>
+        <span class="name">${p.label}</span>
+        <span class="ac-model-badge" style="font-size:0.56rem;min-width:30px;">${tierLabel}</span>
+        <select id="role-model-${p.id}" data-phase="${p.id}">
+          ${opts}
+        </select>
+      </div>
+    `;
+  }).join('');
+  // Restore saved values
+  phases.filter(p => p.id !== 'done').forEach(p => {
+    const sel = $(`role-model-${p.id}`);
+    if (sel && modelConfig.roleOverrides[p.id]) sel.value = modelConfig.roleOverrides[p.id];
+  });
+}
+
+// Test existing model
+window.testExistingModel = async function(modelId) {
+  const item = document.querySelector(`.mc-model-item[data-model-id="${modelId}"] .mc-btn-icon.test`);
+  if (item) { item.classList.add('testing'); item.textContent = '⟳'; }
+  try {
+    const resp = await fetch('/api/models/test', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ model_id: modelId }),  // no api_key -> backend reads from saved
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast(`✅ ${data.model} 连接成功: ${data.response}`, 'success');
+    } else {
+      showToast(`❌ 连接失败: ${data.error}`, 'error');
+    }
+  } catch(e) {
+    showToast('请求失败: ' + e.message, 'error');
+  }
+  if (item) { item.classList.remove('testing'); item.textContent = '⚡'; }
+};
+
+// Delete model
+window.deleteModel = async function(modelId) {
+  if (!confirm(`确认删除模型 ${modelId}？`)) return;
+  try {
+    const resp = await fetch(`/api/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast('模型已删除', 'success');
+      await loadModels();
+    } else {
+      showToast(data.error || '删除失败', 'error');
+    }
+  } catch(e) {
+    showToast('请求失败: ' + e.message, 'error');
+  }
+};
+
+// Save config
+$('mcSave').addEventListener('click', () => {
+  modelConfig.defaultDeep = defaultDeepModel.value;
+  modelConfig.defaultQuick = defaultQuickModel.value;
+  modelConfig.roleOverrides = {};
+  phases.filter(p => p.id !== 'done').forEach(p => {
+    const sel = $(`role-model-${p.id}`);
+    if (sel && sel.value) modelConfig.roleOverrides[p.id] = sel.value;
+  });
+  modelConfigEl.classList.remove('show');
+  configToggle.classList.remove('active');
+  updateCardModelBadges();
+  showToast('模型配置已保存', 'success');
+});
+
+$('mcReset').addEventListener('click', () => {
+  defaultDeepModel.value = '';
+  defaultQuickModel.value = '';
+  phases.filter(p => p.id !== 'done').forEach(p => {
+    const sel = $(`role-model-${p.id}`);
+    if (sel) sel.value = '';
+  });
+  modelConfig = { defaultDeep: '', defaultQuick: '', roleOverrides: {} };
+  updateCardModelBadges();
+  showToast('配置已重置', 'success');
+});
+
+function updateCardModelBadges() {
+  phases.filter(p => p.id !== 'done').forEach(p => {
+    const badge = document.querySelector(`.agent-card[data-phase="${p.id}"] .ac-model-badge`);
+    if (!badge) return;
+    const override = modelConfig.roleOverrides[p.id];
+    const tier = p.id === 'research_manager' || p.id === 'risk_judge' ? 'deep' : 'quick';
+    const defaultModel = tier === 'deep' ? (modelConfig.defaultDeep || (userModels[0]?.model_id || 'ark-code-latest')) : (modelConfig.defaultQuick || (userModels[0]?.model_id || 'ark-code-latest'));
+    badge.textContent = override || defaultModel;
+    badge.title = override ? `覆盖: ${override}` : `默认: ${defaultModel}`;
+  });
+}
+
+function buildModelOverrides() {
+  const overrides = {};
+  if (modelConfig.defaultDeep) overrides.deep_think = modelConfig.defaultDeep;
+  if (modelConfig.defaultQuick) overrides.quick_think = modelConfig.defaultQuick;
+  for (const [pid, modelId] of Object.entries(modelConfig.roleOverrides)) {
+    if (pid === 'research_manager' || pid === 'risk_judge') {
+      overrides.deep_think = modelId;
+    } else {
+      overrides.quick_think = modelId;
+    }
+  }
+  if (!overrides.deep_think && !overrides.quick_think) return '';
+  return JSON.stringify(overrides);
+}
+
+// ═══ Search ═══
+let searchTimer = null;
+searchInput.addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 1) { searchResults.classList.remove('show'); return; }
+  searchTimer = setTimeout(() => doSearch(q), 300);
+});
+searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') searchResults.classList.remove('show'); });
+document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) searchResults.classList.remove('show'); });
+
+async function doSearch(query) {
+  try {
+    const resp = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`);
+    const data = await resp.json();
+    if (!data.ok || !data.data?.length) { searchResults.classList.remove('show'); return; }
+    searchResults.innerHTML = data.data.map(s => `
+      <div class="search-result-item" data-code="${s.code}" data-name="${s.name}">
+        <span class="code">${s.code}</span>
+        <span class="name">${s.name}</span>
+        <span class="market">${s.market}</span>
+      </div>
+    `).join('');
+    searchResults.classList.add('show');
+    searchResults.querySelectorAll('.search-result-item').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedStock = { code: el.dataset.code, name: el.dataset.name };
+        searchInput.value = `${el.dataset.name} (${el.dataset.code})`;
+        searchResults.classList.remove('show');
+        analyzeBtn.disabled = false;
+      });
+    });
+  } catch (e) { console.error('Search error:', e); }
+}
+
+// ═══ Analyze ═══
+analyzeBtn.addEventListener('click', () => {
+  if (!selectedStock) return;
+  startAnalysis(selectedStock.code, dateInput.value);
+});
+
+function startAnalysis(ticker, date) {
+  if (eventSource) eventSource.close();
+  errorState.classList.remove('show');
+  decisionPanel.classList.remove('show');
+  emptyState.style.display = 'none';
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = '分析中…';
+  cardStates = {};
+
+  const overrides = buildModelOverrides();
+  let url = `/api/analyze?ticker=${encodeURIComponent(ticker)}&date=${encodeURIComponent(date)}`;
+  if (overrides) url += `&model_overrides=${encodeURIComponent(overrides)}`;
+  eventSource = new EventSource(url);
+
+  eventSource.addEventListener('start', e => {
+    const data = JSON.parse(e.data);
+    phases = data.phases || [];
+    totalSteps = data.total_steps || 11;
+    renderCards();
+    updateCardModelBadges();
+    pipeline.classList.add('running');
+    statusBar.className = 'status-bar running';
+    statusText.innerHTML = `正在分析 <strong>${data.ticker}</strong> · ${data.date}`;
+  });
+
+  eventSource.addEventListener('message', e => { handleMessage(JSON.parse(e.data)); });
+  eventSource.addEventListener('state', e => { handleState(JSON.parse(e.data)); });
+  eventSource.addEventListener('done', e => { handleDone(JSON.parse(e.data)); });
+
+  eventSource.addEventListener('error', e => {
+    if (e.data) {
+      try { const data = JSON.parse(e.data); showError(data.error, data.traceback); return; } catch(_) {}
+    }
+    if (eventSource.readyState === EventSource.CLOSED) return;
+    showError('SSE 连接中断', '');
+  });
+
+  eventSource.addEventListener('cancel', e => {
+    statusText.textContent = '分析已取消';
+    statusBar.className = 'status-bar';
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = '开始分析';
+  });
+}
+
+// ═══ Pipeline Stage Layout (取代 Timeline + Cards Grid) ═══
+
+// 阶段组定义：将 11 个 phase 按流水线分组
+const STAGE_GROUPS = [
+  {
+    id: 'analysts', label: '前排分析', emoji: '🔍',
+    desc: '四位分析师并行采集数据',
+    phases: ['market_analyst', 'social_analyst', 'news_analyst', 'fundamentals_analyst'],
+  },
+  {
+    id: 'summarise', label: '情景总结', emoji: '📝',
+    desc: '汇总四方数据生成综合报告',
+    phases: ['summariser'],
+  },
+  {
+    id: 'debate', label: '牛熊辩论', emoji: '⚖️',
+    desc: '多空双方交锋，裁判裁决',
+    phases: ['bull_bear', 'research_manager'],
+  },
+  {
+    id: 'trade', label: '交易决策', emoji: '💰',
+    desc: '根据裁决结果制定交易计划',
+    phases: ['trader'],
+  },
+  {
+    id: 'risk', label: '风险评估', emoji: '🛡️',
+    desc: '激进/保守/中立三方辩论',
+    phases: ['risk_debate'],
+  },
+  {
+    id: 'judge', label: '最终裁定', emoji: '⚡',
+    desc: '风险裁判综合研判，输出最终决策',
+    phases: ['risk_judge'],
+  },
+];
+
+function getPhaseDef(phaseId) {
+  return phases.find(p => p.id === phaseId);
+}
+
+function isStageActive(stagePhases) {
+  return stagePhases.some(pid => {
+    const cs = cardStates[pid];
+    return cs && cs.status === 'running';
+  });
+}
+
+function isStageCompleted(stagePhases) {
+  return stagePhases.every(pid => {
+    const cs = cardStates[pid];
+    return cs && cs.status === 'done';
+  });
+}
+
+function isStageCurrent(stagePhases, currentStep) {
+  return stagePhases.some(pid => {
+    const pdef = getPhaseDef(pid);
+    return pdef && pdef.step === currentStep;
+  });
+}
+
+function updatePipeline(currentStep, completedPhases) {
+  stepCounter.textContent = `步骤 ${currentStep} / ${totalSteps}`;
+
+  // 同步更新 pipeline 阶段组状态
+  STAGE_GROUPS.forEach(sg => {
+    const stageEl = document.querySelector(`.stage-group[data-stage="${sg.id}"]`);
+    if (!stageEl) return;
+    stageEl.classList.remove('active', 'completed', 'current');
+    if (isStageCompleted(sg.phases)) stageEl.classList.add('completed');
+    else if (isStageCurrent(sg.phases, currentStep)) stageEl.classList.add('current', 'active');
+    else if (isStageActive(sg.phases)) stageEl.classList.add('active');
+  });
+
+  // 更新阶段连接器
+  const stageConnectors = [...document.querySelectorAll('.stage-connector')];
+  stageConnectors.forEach((conn, i) => {
+    const sg = STAGE_GROUPS[i];
+    if (sg && isStageCompleted(sg.phases)) conn.classList.add('completed');
+    else conn.classList.remove('completed');
+  });
+}
+
+function renderCards() {
+  // 渲染流水线布局
+  const html = STAGE_GROUPS.map((sg, idx) => {
+    const stageCards = sg.phases.map(pid => {
+      const p = getPhaseDef(pid);
+      if (!p) return '';
+      const hasMulti = p.agents && p.agents.length > 1;
+      return `
+        <div class="agent-card" data-phase="${pid}">
+          <div class="ac-header">
+            <span class="ac-emoji">${p.emoji}</span>
+            <span class="ac-title">${p.label}</span>
+            <span class="ac-model-badge">ark-code-latest</span>
+            <span class="ac-status waiting" id="status-${pid}">等待</span>
+            <span class="ac-step">${String(p.step).padStart(2, '0')}</span>
+          </div>
+          ${hasMulti ? `<div class="agent-tabs" id="tabs-${pid}" style="display:none;"></div>` : ''}
+          <div class="ac-body" id="body-${pid}">
+            <div class="msg-line" style="color: var(--text-mute); font-style: italic;">等待启动…</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const isLast = idx === STAGE_GROUPS.length - 1;
+    const connectorHtml = isLast ? '' : `
+      <div class="stage-connector" data-stage-idx="${idx}">
+        <span class="connector-label">↓</span>
+        <div class="connector-line"></div>
+      </div>
+    `;
+
+    return `
+      <div class="stage-group" data-stage="${sg.id}">
+        <div class="stage-node">${sg.emoji}</div>
+        <div class="stage-container">
+          <div class="stage-header">
+            <span class="stage-emoji">${sg.emoji}</span>
+            <span class="stage-title">${sg.label}</span>
+            <span class="stage-arrow"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" class="arrow-svg"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span style="font-size:0.66rem;color:var(--text-mute);margin-left:4px">${sg.desc}</span>
+            <span class="stage-step">${sg.phases.map(p => String(getPhaseDef(p)?.step || '').padStart(2, '0')).join(',')}</span>
+            <span class="stage-status waiting" id="stage-status-${sg.id}">等待</span>
+          </div>
+          <div class="stage-body">
+            ${stageCards}
+          </div>
+        </div>
+      </div>
+      ${connectorHtml}
+    `;
+  }).join('');
+
+  pipeline.innerHTML = html;
+}
+
+// ═══ Agent Name Map ═══
+const AGENT_NAME_MAP = {
+  'market analyst': '市场分析师', 'social analyst': '情绪分析师',
+  'social sentiment analyst': '情绪分析师', 'news analyst': '新闻分析师',
+  'fundamentals analyst': '基本面分析师', 'situation summariser': '情景总结',
+  'bull researcher': '看多研究员', 'bear researcher': '看空研究员',
+  'research manager': '辩论裁判', 'trader': '交易员',
+  'aggressive analyst': '激进分析师', 'conservative analyst': '保守分析师',
+  'neutral analyst': '中立分析师', 'risk judge': '风险裁判', 'risk manager': '风险裁判',
+};
+
+function getAgentDisplayName(name) {
+  const lower = (name || '').toLowerCase().trim();
+  return AGENT_NAME_MAP[lower] || name;
+}
+
+function normalizeAgentKey(name, fallbackId) {
+  const lower = (name || '').toLowerCase().trim();
+  if (!lower) return fallbackId || 'default';
+  for (const key of Object.keys(AGENT_NAME_MAP)) {
+    if (lower.includes(key) || key.includes(lower)) return key.replace(/ /g, '_');
+  }
+  if (lower.startsWith('market_report')) return 'market_analyst';
+  if (lower.startsWith('fundamentals_report')) return 'fundamentals_analyst';
+  if (lower.startsWith('news_report')) return 'news_analyst';
+  if (lower.startsWith('sentiment_report')) return 'social_analyst';
+  if (lower.startsWith('bull')) return 'bull_researcher';
+  if (lower.startsWith('bear')) return 'bear_researcher';
+  if (lower.startsWith('judge') || lower.startsWith('research_manager')) return 'research_manager';
+  if (lower.startsWith('trader')) return 'trader';
+  if (lower.startsWith('aggressive')) return 'aggressive_analyst';
+  if (lower.startsWith('conservative')) return 'conservative_analyst';
+  if (lower.startsWith('neutral')) return 'neutral_analyst';
+  if (lower.startsWith('risk_judge') || lower.startsWith('riskjudge') || lower.startsWith('risk_manager')) return 'risk_judge';
+  return lower.replace(/[^a-z0-9]/g, '_');
+}
+
+// ═══ Markdown ═══
+function renderMarkdown(text) {
+  if (!text) return '';
+  try {
+    if (window.marked) {
+      marked.setOptions({ breaks: true, gfm: true });
+      const rawHtml = marked.parse(text);
+      return window.DOMPurify ? DOMPurify.sanitize(rawHtml) : rawHtml;
+    }
+  } catch(e) {}
+  return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
+// ═══ Cards (保留渲染，适配 pipeline 布局) ═══
+function getOrCreateCardState(phaseId) {
+  if (!cardStates[phaseId]) {
+    const phaseDef = phases.find(p => p.id === phaseId);
+    cardStates[phaseId] = {
+      status: 'waiting', agents: {}, agentOrder: [], activeTab: 0,
+      hasTabs: !!(phaseDef?.agents && phaseDef.agents.length > 1),
+      receivedContent: false,
+    };
+  }
+  return cardStates[phaseId];
+}
+
+function updateStageStatus(stageId, status) {
+  const el = $(`stage-status-${stageId}`);
+  if (!el) return;
+  el.className = `stage-status ${status}`;
+  el.textContent = status === 'running' ? '进行中' : status === 'done' ? '完成' : '等待';
+}
+
+function handleMessage(data) {
+  const phase = data.phase;
+  if (!phase) return;
+  updatePipeline(data.current_step, data.phases_completed || []);
+
+  const card = document.querySelector(`.agent-card[data-phase="${phase.id}"]`);
+  if (!card) return;
+
+  const cs = getOrCreateCardState(phase.id);
+  if (cs.status !== 'done') {
+    card.classList.add('active');
+    card.classList.remove('completed');
+    const statusEl = $(`status-${phase.id}`);
+    if (statusEl) { statusEl.className = 'ac-status running'; statusEl.textContent = '分析中'; }
+    cs.status = 'running';
+  }
+
+  const rawName = data.name || '';
+  const agentKey = normalizeAgentKey(rawName, phase.id);
+  const displayName = getAgentDisplayName(rawName) || getAgentDisplayName(agentKey.replace(/_/g, ' ')) || rawName || '未知';
+
+  if (!cs.agents[agentKey]) {
+    cs.agents[agentKey] = { displayName, content: '', startTime: data.timestamp || new Date().toISOString() };
+    cs.agentOrder.push(agentKey);
+  } else if (!cs.agents[agentKey].displayName || cs.agents[agentKey].displayName === '未知') {
+    cs.agents[agentKey].displayName = displayName;
+  }
+
+  if (data.content) {
+    cs.agents[agentKey].content += data.content;
+    cs.receivedContent = true;
+  }
+  renderCardBody(phase.id);
+
+  // 更新阶段组状态
+  const stageGroup = STAGE_GROUPS.find(sg => sg.phases.includes(phase.id));
+  if (stageGroup) updateStageStatus(stageGroup.id, 'running');
+}
+
+function renderCardBody(phaseId) {
+  const cs = getOrCreateCardState(phaseId);
+  const bodyEl = $(`body-${phaseId}`);
+  const tabsEl = $(`tabs-${phaseId}`);
+  if (!bodyEl) return;
+
+  const agentKeys = cs.agentOrder;
+  if (agentKeys.length === 0) return;
+
+  if (cs.hasTabs && tabsEl) {
+    if (agentKeys.length > 1) {
+      tabsEl.style.display = 'flex';
+      tabsEl.innerHTML = agentKeys.map((key, i) => {
+        const agent = cs.agents[key];
+        const isActive = i === cs.activeTab;
+        return `<span class="agent-tab ${isActive ? 'active' : ''}" data-idx="${i}" onclick="switchTab('${phaseId}', ${i})">${agent.displayName}</span>`;
+      }).join('');
+    } else { tabsEl.style.display = 'none'; }
+  }
+
+  if (cs.activeTab >= agentKeys.length) cs.activeTab = 0;
+  const activeKey = agentKeys[cs.activeTab];
+  const agent = cs.agents[activeKey];
+  if (!agent) return;
+
+  const timeStr = agent.startTime ? new Date(agent.startTime).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '';
+  const contentHtml = renderMarkdown(agent.content);
+
+  bodyEl.innerHTML = `
+    <div class="msg-line">
+      <div class="msg-meta">[${agent.displayName}] ${timeStr}</div>
+      <div class="msg-content">${contentHtml}</div>
+    </div>
+  `;
+  bodyEl.scrollTop = bodyEl.scrollHeight;
+}
+
+window.switchTab = function(phaseId, idx) {
+  const cs = getOrCreateCardState(phaseId);
+  cs.activeTab = idx;
+  renderCardBody(phaseId);
+};
+
+function handleState(data) {
+  if (!data.state_data) return;
+  const sd = data.state_data;
+
+  const reportMap = {
+    market_report: { phaseId: 'market_analyst', agentName: 'Market Analyst' },
+    fundamentals_report: { phaseId: 'fundamentals_analyst', agentName: 'Fundamentals Analyst' },
+    news_report: { phaseId: 'news_analyst', agentName: 'News Analyst' },
+    sentiment_report: { phaseId: 'social_analyst', agentName: 'Social Analyst' },
+  };
+
+  for (const [field, info] of Object.entries(reportMap)) {
+    if (sd[field]) {
+      const { phaseId, agentName } = info;
+      const cs = getOrCreateCardState(phaseId);
+      const agentKey = normalizeAgentKey(agentName, phaseId);
+      if (!cs.agents[agentKey]) {
+        cs.agents[agentKey] = { displayName: getAgentDisplayName(agentName), content: '', startTime: new Date().toISOString() };
+        if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+      }
+      if (cs.agents[agentKey].content.length < sd[field].length) {
+        cs.agents[agentKey].content = sd[field];
+        cs.receivedContent = true;
+      }
+      renderCardBody(phaseId);
+    }
+  }
+
+  if (sd.investment_debate) {
+    const debate = sd.investment_debate;
+    const phaseId = 'bull_bear';
+    const cs = getOrCreateCardState(phaseId);
+    const debateMap = [
+      { key: 'bull_history', name: 'Bull Researcher' },
+      { key: 'bear_history', name: 'Bear Researcher' },
+      { key: 'judge_decision', name: 'Research Manager' },
+    ];
+    debateMap.forEach(({key, name}) => {
+      if (debate[key]) {
+        const agentKey = normalizeAgentKey(name, phaseId);
+        if (!cs.agents[agentKey]) {
+          cs.agents[agentKey] = { displayName: getAgentDisplayName(name), content: '', startTime: new Date().toISOString() };
+          if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+        }
+        if (cs.agents[agentKey].content.length < debate[key].length) {
+          cs.agents[agentKey].content = debate[key];
+          cs.receivedContent = true;
+        }
+      }
+    });
+    renderCardBody(phaseId);
+  }
+
+  if (sd.risk_debate) {
+    const rd = sd.risk_debate;
+    const phaseId = 'risk_debate';
+    const cs = getOrCreateCardState(phaseId);
+    const riskMap = [
+      { key: 'aggressive_history', name: 'Aggressive Analyst' },
+      { key: 'conservative_history', name: 'Conservative Analyst' },
+      { key: 'neutral_history', name: 'Neutral Analyst' },
+      { key: 'judge_decision', name: 'Risk Judge' },
+    ];
+    riskMap.forEach(({key, name}) => {
+      if (rd[key]) {
+        const agentKey = normalizeAgentKey(name, phaseId);
+        if (!cs.agents[agentKey]) {
+          cs.agents[agentKey] = { displayName: getAgentDisplayName(name), content: '', startTime: new Date().toISOString() };
+          if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+        }
+        if (cs.agents[agentKey].content.length < rd[key].length) {
+          cs.agents[agentKey].content = rd[key];
+          cs.receivedContent = true;
+        }
+      }
+    });
+    renderCardBody(phaseId);
+  }
+
+  if (sd.trader_plan) {
+    const phaseId = 'trader';
+    const cs = getOrCreateCardState(phaseId);
+    const agentKey = normalizeAgentKey('Trader', phaseId);
+    if (!cs.agents[agentKey]) {
+      cs.agents[agentKey] = { displayName: getAgentDisplayName('Trader'), content: '', startTime: new Date().toISOString() };
+      if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+    }
+    if (cs.agents[agentKey].content.length < sd.trader_plan.length) {
+      cs.agents[agentKey].content = sd.trader_plan;
+      cs.receivedContent = true;
+    }
+    renderCardBody(phaseId);
+  }
+
+  if (sd.final_decision) {
+    const phaseId = 'risk_judge';
+    const cs = getOrCreateCardState(phaseId);
+    const agentKey = normalizeAgentKey('Risk Judge', phaseId);
+    if (!cs.agents[agentKey]) {
+      cs.agents[agentKey] = { displayName: getAgentDisplayName('Risk Judge'), content: '', startTime: new Date().toISOString() };
+      if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+    }
+    if (cs.agents[agentKey].content.length < sd.final_decision.length) {
+      cs.agents[agentKey].content = sd.final_decision;
+      cs.receivedContent = true;
+    }
+    renderCardBody(phaseId);
+  }
+
+  if (sd.summariser_report) {
+    const phaseId = 'summariser';
+    const cs = getOrCreateCardState(phaseId);
+    const agentKey = normalizeAgentKey('Situation Summariser', phaseId);
+    if (!cs.agents[agentKey]) {
+      cs.agents[agentKey] = { displayName: getAgentDisplayName('Situation Summariser'), content: '', startTime: new Date().toISOString() };
+      if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+    }
+    if (cs.agents[agentKey].content.length < sd.summariser_report.length) {
+      cs.agents[agentKey].content = sd.summariser_report;
+      cs.receivedContent = true;
+    }
+    renderCardBody(phaseId);
+  }
+}
+
+// ═══ Done ═══
+function handleDone(data) {
+  pipeline.classList.add('running');
+
+  phases.forEach(p => {
+    if (p.id === 'done') return;
+    const cs = cardStates[p.id];
+    const statusEl = $(`status-${p.id}`);
+    const card = document.querySelector(`.agent-card[data-phase="${p.id}"]`);
+    if (cs && cs.receivedContent) {
+      cs.status = 'done';
+      if (statusEl) { statusEl.className = 'ac-status done'; statusEl.textContent = '完成'; }
+      if (card) { card.classList.remove('active'); card.classList.add('completed'); }
+    } else {
+      if (statusEl && statusEl.textContent === '分析中') { statusEl.className = 'ac-status waiting'; statusEl.textContent = '等待'; }
+    }
+  });
+
+  // 所有阶段组标记完成
+  STAGE_GROUPS.forEach(sg => {
+    const stageEl = document.querySelector(`.stage-group[data-stage="${sg.id}"]`);
+    if (stageEl) { stageEl.classList.remove('active', 'current'); stageEl.classList.add('completed'); }
+    updateStageStatus(sg.id, 'done');
+  });
+  document.querySelectorAll('.stage-connector').forEach(c => c.classList.add('completed'));
+
+  const rec = data.decision || {};
+  if (rec.signal) {
+    decisionPanel.classList.add('show');
+    decisionSignal.className = `decision-signal ${rec.signal}`;
+    decisionSignal.textContent = rec.signal_cn || rec.signal;
+
+    const confidence = rec.confidence != null ? `${(rec.confidence * 100).toFixed(0)}%` : '-';
+    const entry = rec.entry_reference_price != null ? `¥${rec.entry_reference_price}` : '-';
+    const target = rec.target_price != null ? `¥${rec.target_price}` : '-';
+    const stopLoss = rec.stop_loss != null ? `¥${rec.stop_loss}` : '-';
+    const sizeFrac = rec.size_fraction != null ? `${(rec.size_fraction * 100).toFixed(0)}%` : '-';
+    const horizon = rec.time_horizon_days != null ? `${rec.time_horizon_days}天` : '-';
+    const rationaleText = rec.rationale_cn || rec.rationale || '-';
+    const rationaleHtml = renderMarkdown(rationaleText);
+
+    decisionBody.innerHTML = `
+      <div class="dmetric"><span class="label">置信度</span><span class="value">${confidence}</span></div>
+      <div class="dmetric"><span class="label">建议仓位</span><span class="value">${sizeFrac}</span></div>
+      <div class="dmetric"><span class="label">参考入场价</span><span class="value">${entry}</span></div>
+      <div class="dmetric"><span class="label">目标价</span><span class="value">${target}</span></div>
+      <div class="dmetric"><span class="label">止损价</span><span class="value">${stopLoss}</span></div>
+      <div class="dmetric"><span class="label">持有周期</span><span class="value">${horizon}</span></div>
+      <div class="drationale"><span class="label">决策依据</span><div class="text">${rationaleHtml}</div></div>
+    `;
+  }
+
+  statusBar.className = 'status-bar done';
+  statusText.innerHTML = `分析完成 · <strong>${rec.signal_cn || rec.signal || ''}</strong>`;
+  stepCounter.textContent = `完成 ${totalSteps} / ${totalSteps}`;
+  analyzeBtn.disabled = false;
+  analyzeBtn.textContent = '开始分析';
+  if (eventSource) { eventSource.close(); eventSource = null; }
+}
+
+function showError(msg, tb) {
+  errorState.classList.add('show');
+  errorText.textContent = msg + (tb ? '\n\n' + tb : '');
+  statusBar.className = 'status-bar error';
+  statusText.textContent = '分析出错';
+  analyzeBtn.disabled = false;
+  analyzeBtn.textContent = '开始分析';
+  if (eventSource) { eventSource.close(); eventSource = null; }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ═══ Init ═══
+async function initPhases() {
+  // Hardcoded phases matching backend
+  phases = [
+    {step:1,id:"market_analyst",label:"市场分析师",agents:["Market Analyst"],emoji:"📈"},
+    {step:2,id:"social_analyst",label:"情绪分析师",agents:["Social Sentiment Analyst","Social Analyst"],emoji:"📱"},
+    {step:3,id:"news_analyst",label:"新闻分析师",agents:["News Analyst"],emoji:"📰"},
+    {step:4,id:"fundamentals_analyst",label:"基本面分析师",agents:["Fundamentals Analyst"],emoji:"📊"},
+    {step:5,id:"summariser",label:"情景总结",agents:["Situation Summariser"],emoji:"📝"},
+    {step:6,id:"bull_bear",label:"牛熊辩论",agents:["Bull Researcher","Bear Researcher"],emoji:"⚖️"},
+    {step:7,id:"research_manager",label:"辩论裁判",agents:["Research Manager"],emoji:"👨‍⚖️"},
+    {step:8,id:"trader",label:"交易员",agents:["Trader"],emoji:"💰"},
+    {step:9,id:"risk_debate",label:"风险评估",agents:["Aggressive Analyst","Conservative Analyst","Neutral Analyst"],emoji:"🛡️"},
+    {step:10,id:"risk_judge",label:"风险裁判",agents:["Risk Judge"],emoji:"⚡"},
+    {step:11,id:"done",label:"分析完成",agents:[],emoji:"✅"},
+  ];
+  totalSteps = 11;
+  await loadModels();
+}
+
+initPhases();
+</script>
+</body>
+</html>
