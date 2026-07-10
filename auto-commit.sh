@@ -1,14 +1,12 @@
 #!/bin/bash
 # 智策项目自动提交脚本
 # 当 /opt/tradingagents-app 有代码变更时自动 commit & push 到 GitHub
-# 由 systemd path unit 或 inotifywait 触发
 
 set -euo pipefail
 
 REPO_DIR="/opt/tradingagents-app"
 BRANCH="main"
 LOG_FILE="/var/log/zhice-autocommit.log"
-MAX_WAIT=30  # 文件变更后等待多少秒无新变更再提交
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
@@ -19,15 +17,8 @@ cd "$REPO_DIR"
 # 等待文件写入稳定
 sleep 3
 
-# 检查是否有变更（排除 __pycache__、.pyc、日志等）
-CHANGED=$(git status --porcelain -- \
-    ':!__pycache__/' \
-    ':!*.pyc' \
-    ':!*.log' \
-    ':!nohup.out' \
-    ':!*.tmp' \
-    ':!.env' \
-    2>/dev/null)
+# 检查是否有变更（用 grep 过滤不需要的文件）
+CHANGED=$(git status --porcelain | grep -vE '__pycache__|\.pyc|\.log$|nohup\.out|\.tmp$|\.env$' || true)
 
 if [ -z "$CHANGED" ]; then
     exit 0
@@ -36,14 +27,9 @@ fi
 log "检测到代码变更："
 log "$CHANGED"
 
-# Stage 所有变更（排除敏感文件）
-git add -A -- \
-    ':!__pycache__/' \
-    ':!*.pyc' \
-    ':!*.log' \
-    ':!nohup.out' \
-    ':!*.tmp' \
-    ':!.env'
+# Stage 所有变更，然后取消 stage 敏感文件
+git add -A
+git reset -- .env __pycache__ '*.pyc' '*.log' nohup.out '*.tmp' '*.bak' 2>/dev/null || true
 
 # 生成提交信息
 COMMIT_MSG="auto: $(date '+%Y-%m-%d %H:%M') 代码更新
