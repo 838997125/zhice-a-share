@@ -669,6 +669,10 @@ async def api_analyze(ticker: str, date: str = "", model_overrides: str = ""):
         def run_analysis():
             try:
                 ta = get_ta()
+                # ContextVar 不跨线程，子线程需重新 set_config，否则 load_prompt 的
+                # response_language fallback 到 en-US，导致 agent 输出变成英文
+                from tradingagents import set_config
+                set_config(ta.config)
                 final_state, recommendation = ta.propagate(
                     ticker, date,
                     on_message=on_message,
