@@ -151,6 +151,9 @@ def _create_custom_llm(model_name: str):
             openai_api_key=user_model["api_key"],
             openai_api_base=user_model.get("base_url") or "https://api.openai.com/v1",
             temperature=0,
+            # 关闭 GLM/ARK 思维链推理,大幅降低延迟(15s/次 -> 2s/次)
+            # 基本面分析师有8个工具=9次LLM推理,思维链开启时总耗时>2分钟
+            extra_body={"thinking": {"type": "disabled"}},
         )
     # 回退:用框架默认(读环境变量)
     from tradingagents.llm import build_chat_model

@@ -1,0 +1,34 @@
+--- a/tradingagents/dataflows/yfinance.py
++++ b/tradingagents/dataflows/yfinance.py
+@@ -646,6 +646,16 @@
+             f"shorter-window indicators (10 EMA, rsi) instead.\n\n"
+         )
+ 
++    # 指标说明集中放在开头，避免与数据值混在一起被 LLM 原样复制
++    ind_descriptions = "\n".join(
++        f"- {BEST_IND_PARAMS[ind]}" for ind in indicators if ind in BEST_IND_PARAMS
++    )
++    header = (
++        f"# Technical Indicators for {symbol} ({before_str} to {end_str})\n"
++        f"# Indicator reference (for LLM understanding, do NOT copy into reports):\n"
++        f"{ind_descriptions}\n\n"
++    )
++
+     sections: list[str] = []
+     for ind in indicators:
+         ind_data = data_map[ind]
+@@ -655,12 +665,9 @@
+         else:
+             ind_string = "(no trading days in window)\n"
+         sections.append(
+-            f"## {ind} values from {before_str} to {end_str} (chronological, trading days only):\n\n"
+-            + ind_string
+-            + "\n\n"
+-            + BEST_IND_PARAMS[ind]
++            f"## {ind} values ({len(sorted_dates)} trading days):\n{ind_string}"
+         )
+-    return preamble + "\n\n".join(sections)
++    return preamble + header + "\n\n".join(sections)
+ 
+ 
+ def get_stock_stats_indicators_window(

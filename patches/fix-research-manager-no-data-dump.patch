@@ -1,0 +1,13 @@
+--- a/tradingagents/agents/prompts/research_manager.md
++++ b/tradingagents/agents/prompts/research_manager.md
+@@ -12,7 +12,9 @@
+ 
+ Take into account your past mistakes on similar situations. Use these insights to refine your decision-making. If the past-situations block below is the sentinel "(no relevant past situations found.)", do not invent prior lessons.
+ 
+-Cross-check the debate against the source analyst reports below. Do NOT rely on a debate claim unless it is supported by these reports — otherwise label it explicitly as an unsupported assumption and discount it.
++Cross-check the debate against the source analyst reports below. Do NOT rely on a debate claim unless it is supported by these reports - otherwise label it explicitly as an unsupported assumption and discount it.
++
++IMPORTANT: Do NOT copy raw data, technical indicator values, indicator descriptions, or CSV data into your output. Synthesise the information into concise reasoning. Reference specific values when relevant, but do NOT reproduce bulk data dumps.
+ 
+ Past situations and lessons learned (each block shows the original situation snapshot, its similarity score, and the lesson recorded after the trade outcome was known). Before applying any lesson, decide whether the past situation is truly analogous to the current setup; do not blindly trust high similarity scores.
+ 

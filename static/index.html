@@ -1582,7 +1582,7 @@ function renderCardBody(phaseId) {
       <div class="msg-content">${contentHtml}</div>
     </div>
   `;
-  bodyEl.scrollTop = bodyEl.scrollHeight;
+  bodyEl.scrollTop = 0;
 }
 
 window.switchTab = function(phaseId, idx) {
@@ -1623,24 +1623,28 @@ function handleState(data) {
     const debate = sd.investment_debate;
     const phaseId = 'bull_bear';
     const cs = getOrCreateCardState(phaseId);
+    // 牛熊辩论的 judge_decision 应该放到「辩论裁判」阶段，不是「牛熊辩论」阶段
     const debateMap = [
-      { key: 'bull_history', name: 'Bull Researcher' },
-      { key: 'bear_history', name: 'Bear Researcher' },
-      { key: 'judge_decision', name: 'Research Manager' },
+      { key: 'bull_history', name: 'Bull Researcher', phaseId: 'bull_bear' },
+      { key: 'bear_history', name: 'Bear Researcher', phaseId: 'bull_bear' },
+      { key: 'judge_decision', name: 'Research Manager', phaseId: 'research_manager' },
     ];
-    debateMap.forEach(({key, name}) => {
+    debateMap.forEach(({key, name, phaseId: targetPhaseId}) => {
       if (debate[key]) {
-        const agentKey = normalizeAgentKey(name, phaseId);
-        if (!cs.agents[agentKey]) {
-          cs.agents[agentKey] = { displayName: getAgentDisplayName(name), content: '', startTime: new Date().toISOString() };
-          if (!cs.agentOrder.includes(agentKey)) cs.agentOrder.push(agentKey);
+        const targetCs = getOrCreateCardState(targetPhaseId);
+        const agentKey = normalizeAgentKey(name, targetPhaseId);
+        if (!targetCs.agents[agentKey]) {
+          targetCs.agents[agentKey] = { displayName: getAgentDisplayName(name), content: '', startTime: new Date().toISOString() };
+          if (!targetCs.agentOrder.includes(agentKey)) targetCs.agentOrder.push(agentKey);
         }
-        if (cs.agents[agentKey].content.length < debate[key].length) {
-          cs.agents[agentKey].content = debate[key];
-          cs.receivedContent = true;
+        if (targetCs.agents[agentKey].content.length < debate[key].length) {
+          targetCs.agents[agentKey].content = debate[key];
+          targetCs.receivedContent = true;
         }
+        renderCardBody(targetPhaseId);
       }
     });
+    // 仍然渲染 bull_bear 以更新牛/熊 tab
     renderCardBody(phaseId);
   }
 
