@@ -1,7 +1,7 @@
 """
 akshare 适配层 - A 股数据接口
 
-使用 akshare 替换框架内置的数据流，支持 A 股全市场行情、
+使用 akshare 替换框架内置的数据流,支持 A 股全市场行情、
 财务报表、新闻资讯等数据获取。通过 monkey-patch 在 import 时自动生效。
 
 支持范围：
@@ -9,18 +9,22 @@ akshare 适配层 - A 股数据接口
   - A 股财务报表: stock_financial_report_sina
   - 指数行情: stock_zh_index_daily / index_us_stock_sina
   - 新闻: 东方财富搜索API (50条个股新闻) + 财新网 + 央视新闻联播
+  - 分红送股: stock_dividend_cninfo (巨潮信息网)
+  - 财报披露日历: stock_yysj_em (东方财富)
+  - 机构/十大股东持仓: stock_main_stock_holder + stock_fund_stock_holder
+  - 高管增减持: stock_share_hold_change_sse/szse
+  - 融资融券: stock_margin_detail_sse/szse
+  - 分析师评级: 东方财富研报
 
 不支持的功能（返回 [NO_DATA]）：
-  - 分析师评级（原框架专有，已用东方财富研报替代）
-  - 机构持仓 / 内部人交易 / 做空兴趣（原框架专有）
   - 美股个股行情/财报
 
-用法：import akshare_adapter（必须在分析框架导入之前），自动执行 monkey-patch。
+用法:import akshare_adapter(必须在分析框架导入之前),自动执行 monkey-patch。
 
-Ticker 映射规则：
-  - 6 位数字代码（如 600519、000001、300750）→ 直接用于 akshare
+Ticker 映射规则:
+  - 6 位数字代码(如 600519、000001、300750)→ 直接用于 akshare
   - 带 .SH / .SZ / .BJ 后缀 → 去除后缀取 6 位数字
-  - 美股代码（如 AAPL）→ 尝试 akshare 美股接口，可能不可用
+  - 美股代码(如 AAPL)→ 尝试 akshare 美股接口,可能不可用
 """
 
 from __future__ import annotations
@@ -64,13 +68,13 @@ def _is_a_share(ticker: str) -> bool:
 # ─── 行情数据 ──────────────────────────────────────────────────
 
 def _get_a_share_history(code: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """通过 akshare 获取 A 股日 K 线（前复权）。使用新浪数据源（东方财富接口不可达）。"""
+    """通过 akshare 获取 A 股日 K 线(前复权)。使用新浪数据源(东方财富接口不可达)。"""
     import akshare as ak
     # akshare 的日期格式是 YYYYMMDD
     sd = start_date.replace("-", "")
     ed = end_date.replace("-", "")
 
-    # 确定交易所前缀：6开头=sh, 0/3开头=sz, 8/4开头=bj
+    # 确定交易所前缀:6开头=sh, 0/3开头=sz, 8/4开头=bj
     if code.startswith("6"):
         sina_symbol = f"sh{code}"
     elif code.startswith("0") or code.startswith("3") or code.startswith("2"):
@@ -106,8 +110,8 @@ def _get_a_share_history(code: str, start_date: str, end_date: str) -> pd.DataFr
 
 
 def _resolve_history_with_cache_ak(symbol: str, curr_date_dt: datetime) -> tuple[str, pd.DataFrame, list[str]]:
-    """akshare 版本的 _resolve_history_with_cache — 获取 15 年日 K 线并缓存。"""
-    # 获取缓存目录（兼容未初始化 config 的情况）
+    """akshare 版本的 _resolve_history_with_cache - 获取 15 年日 K 线并缓存。"""
+    # 获取缓存目录(兼容未初始化 config 的情况)
     try:
         from tradingagents.config import get_config
         config = get_config()
@@ -170,9 +174,9 @@ def _resolve_history_with_cache_ak(symbol: str, curr_date_dt: datetime) -> tuple
         tried = ", ".join(candidates)
         if last_error is not None:
             raise RuntimeError(
-                f"Failed to fetch market data for symbol '{symbol}' via akshare (tried: {tried})"
+                f"通过 akshare 获取股票 '{symbol}' 行情数据失败(已尝试:{tried})"
             ) from last_error
-        raise ValueError(f"No market data found for symbol '{symbol}' via akshare (tried: {tried}).")
+        raise ValueError(f"未通过 akshare 找到股票 '{symbol}' 的行情数据(已尝试:{tried})。")
 
     return resolved_symbol, data, candidates
 
@@ -184,16 +188,16 @@ def get_yfin_data_online_ak(
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
     end_date: Annotated[str, "End date in yyyy-mm-dd format"],
 ) -> str:
-    """获取 OHLCV 股票数据（通过 akshare），返回 CSV 字符串。"""
+    """获取 OHLCV 股票数据(通过 akshare),返回 CSV 字符串。"""
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
     if start_dt > end_dt:
-        return f"[TOOL_ERROR] start_date must be on or before end_date"
+        return f"[TOOL_ERROR] 开始日期必须早于或等于结束日期"
 
     try:
         resolved_symbol, data, candidates = _resolve_history_with_cache_ak(symbol, end_dt)
     except (ValueError, RuntimeError) as exc:
-        return f"[TOOL_ERROR] {exc}"
+        return f"[TOOL_ERROR] {exc}"  # 保留原始异常信息
 
     data = data.copy()
     data["Date"] = pd.to_datetime(data["Date"])
@@ -204,7 +208,7 @@ def get_yfin_data_online_ak(
 
     if sliced.empty:
         return (
-            f"{_NO_DATA_PREFIX} No data found for symbol '{symbol}' "
+            f"{_NO_DATA_PREFIX} 未找到股票 '{symbol}' 的数据 "
             f"between {start_date} and {end_date}"
         )
 
@@ -216,11 +220,11 @@ def get_yfin_data_online_ak(
     sliced["Date"] = sliced["Date"].dt.strftime("%Y-%m-%d")
     csv_string = sliced.to_csv(index=False)
 
-    header = f"# Stock data for {resolved_symbol} from {start_date} to {end_date}\n"
-    header += f"# Total records: {len(sliced)}\n"
+    header = f"# 股票数据:{resolved_symbol},{start_date} 至 {end_date}\n"
+    header += f"# 记录总数:{len(sliced)}\n"
     header += "# Note: OHLC values are前复权 (qfq) adjusted.\n"
-    header += f"# Data source: akshare (A股)\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# 数据源:akshare(A股)\n"
+    header += f"# 数据获取时间:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
     return header + csv_string
 
@@ -231,7 +235,7 @@ def get_stock_stats_indicators_batch_ak(
     curr_date: Annotated[str, "current trading date in YYYY-MM-DD format"],
     look_back_days: Annotated[int, "look-back window in days"] = 30,
 ) -> str:
-    """计算技术指标（通过 akshare 行情数据 + stockstats）。"""
+    """计算技术指标(通过 akshare 行情数据 + stockstats)。"""
     from stockstats import wrap
     from dateutil.relativedelta import relativedelta
 
@@ -240,7 +244,7 @@ def get_stock_stats_indicators_batch_ak(
     try:
         resolved_symbol, data, _ = _resolve_history_with_cache_ak(symbol, curr_date_dt)
     except (ValueError, RuntimeError) as exc:
-        return f"[TOOL_ERROR] {exc}"
+        return f"[TOOL_ERROR] {exc}"  # 保留原始异常信息
 
     data = data.copy()
     data["Date"] = pd.to_datetime(data["Date"])
@@ -248,7 +252,7 @@ def get_stock_stats_indicators_batch_ak(
         data["Date"] = data["Date"].dt.tz_localize(None)
     data = data.loc[data["Date"] <= pd.Timestamp(curr_date_dt)].copy()
     if data.empty:
-        return f"{_NO_DATA_PREFIX} No market data found for symbol '{symbol}' on or before {curr_date}."
+        return f"{_NO_DATA_PREFIX} 未找到股票 '{symbol}' 在 {curr_date} 及之前的市场数据。"
 
     df = wrap(data)
     if df["Date"].dt.tz is not None:
@@ -270,7 +274,7 @@ def get_stock_stats_indicators_batch_ak(
         try:
             df[ind]  # trigger stockstats
         except Exception:
-            sections.append(f"## {ind}: [ERROR] Indicator not computable\n")
+            sections.append(f"## {ind}:[错误] 指标无法计算\n")
             continue
         formatted = df[ind].apply(lambda v: "N/A" if pd.isna(v) else str(v))
         ind_data = dict(zip(df["Date"], formatted, strict=False))
@@ -281,7 +285,7 @@ def get_stock_stats_indicators_batch_ak(
             ind_string = "(no trading days in window)\n"
         desc = BEST_IND_PARAMS.get(ind, "")
         sections.append(
-            f"## {ind} values from {before_str} to {end_str} (chronological, trading days only):\n\n"
+            f"## {ind} 指标值,{before_str} 至 {end_str}(按交易日时间顺序):\n\n"
             + ind_string + "\n\n" + desc
         )
     return "\n\n".join(sections)
@@ -315,14 +319,14 @@ def get_balance_sheet_ak(
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
     curr_date: Annotated[str | None, "current trading date in YYYY-MM-DD format"] = None,
 ) -> str:
-    """获取资产负债表（通过 akshare/新浪财经）。"""
+    """获取资产负债表(通过 akshare/新浪财经)。"""
     code = _normalize_a_share_code(ticker)
     if code is None:
-        return f"{_NO_DATA_PREFIX} Balance sheet via akshare only supports A-share tickers, got '{ticker}'"
+        return f"{_NO_DATA_PREFIX} 资产负债表仅支持A股代码,当前为 '{ticker}'"
 
     df = _get_financial_report_sina(code, "资产负债表")
     if df.empty:
-        return f"{_NO_DATA_PREFIX} No balance sheet data found for '{ticker}' via akshare"
+        return f"{_NO_DATA_PREFIX} 未通过 akshare 找到 '{ticker}' 的资产负债表数据"
 
     # 按日期过滤
     if curr_date and "报告日" in df.columns:
@@ -332,17 +336,17 @@ def get_balance_sheet_ak(
 
     # 季度/年度过滤
     if freq == "annual" and "报告日" in df.columns:
-        # 只保留年报（12月31日）
+        # 只保留年报(12月31日)
         df = df[df["报告日"].dt.month == 12].copy()
 
     if df.empty:
-        return f"{_NO_DATA_PREFIX} No balance sheet data for '{ticker}' ({freq}) as of {curr_date or 'latest'}"
+        return f"{_NO_DATA_PREFIX} '{ticker}'({freq})截至 {curr_date or '最新'} 无资产负债表数据"
 
     csv_string = df.to_csv(index=False)
-    header = f"# Balance Sheet data for {ticker} ({freq})\n"
+    header = f"# 资产负债表:{ticker}({freq})\n"
     header += "# Reported currency: CNY\n"
-    header += f"# Data source: akshare/新浪财经\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# 数据源:akshare/新浪财经\n"
+    header += f"# 数据获取时间:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     return header + csv_string
 
 
@@ -351,14 +355,14 @@ def get_income_statement_ak(
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
     curr_date: Annotated[str | None, "current trading date in YYYY-MM-DD format"] = None,
 ) -> str:
-    """获取利润表（通过 akshare/新浪财经）。"""
+    """获取利润表(通过 akshare/新浪财经)。"""
     code = _normalize_a_share_code(ticker)
     if code is None:
-        return f"{_NO_DATA_PREFIX} Income statement via akshare only supports A-share tickers, got '{ticker}'"
+        return f"{_NO_DATA_PREFIX} 利润表仅支持A股代码,当前为 '{ticker}'"
 
     df = _get_financial_report_sina(code, "利润表")
     if df.empty:
-        return f"{_NO_DATA_PREFIX} No income statement data found for '{ticker}' via akshare"
+        return f"{_NO_DATA_PREFIX} 未通过 akshare 找到 '{ticker}' 的利润表数据"
 
     if curr_date and "报告日" in df.columns:
         cutoff = pd.Timestamp(curr_date)
@@ -369,13 +373,13 @@ def get_income_statement_ak(
         df = df[df["报告日"].dt.month == 12].copy()
 
     if df.empty:
-        return f"{_NO_DATA_PREFIX} No income statement data for '{ticker}' ({freq}) as of {curr_date or 'latest'}"
+        return f"{_NO_DATA_PREFIX} '{ticker}'({freq})截至 {curr_date or '最新'} 无利润表数据"
 
     csv_string = df.to_csv(index=False)
-    header = f"# Income Statement data for {ticker} ({freq})\n"
+    header = f"# 利润表:{ticker}({freq})\n"
     header += "# Reported currency: CNY\n"
-    header += f"# Data source: akshare/新浪财经\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# 数据源:akshare/新浪财经\n"
+    header += f"# 数据获取时间:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     return header + csv_string
 
 
@@ -384,14 +388,14 @@ def get_cashflow_ak(
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
     curr_date: Annotated[str | None, "current trading date in YYYY-MM-DD format"] = None,
 ) -> str:
-    """获取现金流量表（通过 akshare/新浪财经）。"""
+    """获取现金流量表(通过 akshare/新浪财经)。"""
     code = _normalize_a_share_code(ticker)
     if code is None:
-        return f"{_NO_DATA_PREFIX} Cash flow via akshare only supports A-share tickers, got '{ticker}'"
+        return f"{_NO_DATA_PREFIX} 现金流量表仅支持A股代码,当前为 '{ticker}'"
 
     df = _get_financial_report_sina(code, "现金流量表")
     if df.empty:
-        return f"{_NO_DATA_PREFIX} No cash flow data found for '{ticker}' via akshare"
+        return f"{_NO_DATA_PREFIX} 未通过 akshare 找到 '{ticker}' 的现金流量表数据"
 
     if curr_date and "报告日" in df.columns:
         cutoff = pd.Timestamp(curr_date)
@@ -402,13 +406,13 @@ def get_cashflow_ak(
         df = df[df["报告日"].dt.month == 12].copy()
 
     if df.empty:
-        return f"{_NO_DATA_PREFIX} No cash flow data for '{ticker}' ({freq}) as of {curr_date or 'latest'}"
+        return f"{_NO_DATA_PREFIX} '{ticker}'({freq})截至 {curr_date or '最新'} 无现金流量表数据"
 
     csv_string = df.to_csv(index=False)
-    header = f"# Cash Flow data for {ticker} ({freq})\n"
+    header = f"# 现金流量表:{ticker}({freq})\n"
     header += "# Reported currency: CNY\n"
-    header += f"# Data source: akshare/新浪财经\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# 数据源:akshare/新浪财经\n"
+    header += f"# 数据获取时间:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     return header + csv_string
 
 
@@ -418,15 +422,15 @@ def get_fundamentals_ak(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current trading date in YYYY-MM-DD format"] = None,
 ) -> str:
-    """获取基本面概览（通过 akshare）。"""
+    """获取基本面概览(通过 akshare)。"""
     code = _normalize_a_share_code(ticker)
     if code is None:
-        return f"{_NO_DATA_PREFIX} Fundamentals via akshare only supports A-share tickers, got '{ticker}'"
+        return f"{_NO_DATA_PREFIX} 基本面数据仅支持A股代码,当前为 '{ticker}'"
 
     import akshare as ak
     lines: list[str] = []
 
-    # 个股信息（使用新浪接口，东方财富不可达）
+    # 个股信息(使用新浪接口,东方财富不可达)
     try:
         # 尝试通过新浪获取个股信息
         sina_symbol = f"sh{code}" if code.startswith("6") else f"sz{code}"
@@ -437,7 +441,7 @@ def get_fundamentals_ak(
         lines.append(f"Name: {ticker}")
         lines.append(f"Symbol: {code}")
 
-    # 尝试获取行业信息（通过东方财富，可能不可达）
+    # 尝试获取行业信息(通过东方财富,可能不可达)
     try:
         info = ak.stock_individual_info_em(symbol=code)
         info_dict = dict(zip(info["item"], info["value"]))
@@ -467,12 +471,12 @@ def get_fundamentals_ak(
     except Exception:
         pass
 
-    header = f"# Company Fundamentals for {ticker}\n"
+    header = f"# 公司基本面:{ticker}\n"
     if curr_date:
-        header += f"# Current trading date: {curr_date}\n"
+        header += f"# 当前交易日:{curr_date}\n"
     header += "# Reported currency: CNY\n"
-    header += f"# Data source: akshare\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# 数据源:akshare\n"
+    header += f"# 数据获取时间:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     return header + "\n".join(lines)
 
 
@@ -483,7 +487,7 @@ def get_market_context_ak(
     curr_date: Annotated[str, "current trading date in YYYY-MM-DD format"],
     look_back_days: Annotated[int, "look-back window in days"] = 5,
 ) -> str:
-    """返回市场宏观环境快照（通过 akshare）。"""
+    """返回市场宏观环境快照(通过 akshare)。"""
     import akshare as ak
 
     curr_dt = datetime.strptime(curr_date, "%Y-%m-%d")
@@ -523,20 +527,20 @@ def get_market_context_ak(
                 high = float(window["close"].max())
                 low = float(window["close"].min())
                 sections.append(
-                    f"## Local index: {idx_label} ({idx_symbol})\n"
+                    f"## 本地指数:{idx_label}({idx_symbol})\n"
                     f"Latest close: {last_close:.2f}\n"
-                    f"Window change: {pct:+.2f}%\n"
-                    f"Window range: low {low:.2f} -- high {high:.2f}"
+                    f"区间涨跌幅:{pct:+.2f}%\n"
+                    f"区间范围:最低 {low:.2f} -- 最高 {high:.2f}"
                 )
     except Exception as exc:
-        sections.append(f"## Local index: {idx_label} ({idx_symbol})\n[TOOL_ERROR] {exc!s}")
+        sections.append(f"## 本地指数:{idx_label}({idx_symbol})\n[TOOL_ERROR] {exc!s}")
 
-    header = f"# Data source: akshare\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    header = f"# 数据源:akshare\n"
+    header += f"# 数据获取时间:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     return header + "\n\n".join(sections)
 
 
-# ─── 分析师评级（东方财富研报）────────────────────────────────
+# ─── 分析师评级(东方财富研报)────────────────────────────────
 
 def get_analyst_ratings_ak(
     ticker: str,
@@ -544,16 +548,16 @@ def get_analyst_ratings_ak(
 ) -> str:
     """用东方财富研报数据替代 yfinance 分析师评级。
 
-    返回最近 30 条研报评级，包含：评级、机构、研究员、日期、
-    盈利预测（EPS/PE）。
+    返回最近 30 条研报评级,包含:评级、机构、研究员、日期、
+    盈利预测(EPS/PE)。
     """
     try:
         import akshare as ak
         df = ak.stock_research_report_em(symbol=ticker)
         if df is None or df.empty:
-            return f"{_NO_DATA_PREFIX} No analyst ratings found for '{ticker}' via akshare."
+            return f"{_NO_DATA_PREFIX} 未通过 akshare 找到 '{ticker}' 的分析师评级数据。"
 
-        # 筛选日期（curr_date 之前的报告）
+        # 筛选日期(curr_date 之前的报告)
         if curr_date:
             try:
                 df["日期"] = df["日期"].astype(str)
@@ -562,7 +566,7 @@ def get_analyst_ratings_ak(
                 pass
 
         if df.empty:
-            return f"{_NO_DATA_PREFIX} No analyst ratings for '{ticker}' on or before {curr_date}."
+            return f"{_NO_DATA_PREFIX} '{ticker}' 在 {curr_date} 及之前无分析师评级数据。"
 
         # 取最近 30 条
         df = df.head(30)
@@ -575,7 +579,7 @@ def get_analyst_ratings_ak(
 
         lines = []
         lines.append(f"# Analyst Ratings for {ticker} (东方财富研报)")
-        lines.append(f"# Data source: akshare -> 东方财富")
+        lines.append(f"# 数据源:akshare -> 东方财富")
         if curr_date:
             lines.append(f"# Filtered to reports on or before {curr_date}")
         lines.append(f"# Total recent reports: {len(df)}")
@@ -615,34 +619,419 @@ def get_analyst_ratings_ak(
         lines.append("## Note")
         lines.append("- 评级说明: 买入 > 增持 > 中性 > 减持 > 卖出")
         lines.append("- 数据来源: 东方财富研报中心")
-        lines.append("- EPS/PE 为机构盈利预测值，非实际财报数据")
+        lines.append("- EPS/PE 为机构盈利预测值,非实际财报数据")
 
         return "\n".join(lines)
     except Exception as e:
         logger.error("get_analyst_ratings_ak error: %s", e)
-        return f"{_NO_DATA_PREFIX} Failed to fetch analyst ratings for '{ticker}' via akshare: {e}"
+        return f"{_NO_DATA_PREFIX} 获取 '{ticker}' 分析师评级数据失败:{e}"
 
 
-# ─── 不支持的功能 ──────────────────────────────────────────────
+# ─── 分红送股 (stock_dividend_cninfo) ──────────────────────────────
 
-def _not_supported(func_name: str):
-    def _impl(*args, **kwargs):
-        ticker = args[0] if args else kwargs.get("ticker", "?")
-        return (
-            f"{_NO_DATA_PREFIX} {func_name} for '{ticker}': "
-            f"akshare adapter does not support this data source. "
-            f"Only A-share market data, financial statements, and fundamentals are available."
-        )
-    _impl.__name__ = func_name
-    return _impl
+def get_dividends_splits_ak(ticker: str, start_date: str, end_date: str) -> str:
+    """用巨潮信息网分红送股数据替代 yfinance dividends/splits。
+
+    返回指定日期范围内的分红送股记录,包含送股比例、转增比例、
+    派息比例、股权登记日、除权日等信息。
+    """
+    try:
+        import akshare as ak
+
+        code = _normalize_a_share_code(ticker)
+        if code is None:
+            return f"{_NO_DATA_PREFIX} 分红送股数据仅支持A股代码;got '{ticker}'."
+
+        df = ak.stock_dividend_cninfo(symbol=code)
+        if df is None or df.empty:
+            return f"{_NO_DATA_PREFIX} 未找到 '{ticker}' 的分红送股记录。"
+
+        # 日期过滤
+        date_col = "实施方案公告日期" if "实施方案公告日期" in df.columns else df.columns[0]
+        try:
+            df[date_col] = df[date_col].astype(str)
+            if start_date:
+                df = df[df[date_col] >= start_date]
+            if end_date:
+                df = df[df[date_col] <= end_date]
+        except Exception:
+            pass
+
+        if df.empty:
+            return f"{_NO_DATA_PREFIX} '{ticker}' 在 {start_date}~{end_date} 范围内无分红送股记录。"
+
+        lines = [
+            f"# Dividends & Splits for {ticker} (巨潮信息网)",
+            f"# 数据源:akshare -> cninfo",
+            f"# 记录数: {len(df)}",
+            "",
+            "| 公告日期 | 分红类型 | 送股 | 转增 | 派息 | 股权登记日 | 除权日 | 派息日 | 说明 |",
+            "|----------|----------|------|------|------|-----------|--------|--------|------|",
+        ]
+        for _, row in df.iterrows():
+            lines.append(
+                f"| {row.get('实施方案公告日期', '')} "
+                f"| {row.get('分红类型', '')} "
+                f"| {row.get('送股比例', '-')} "
+                f"| {row.get('转增比例', '-')} "
+                f"| {row.get('派息比例', '-')} "
+                f"| {row.get('股权登记日', '-')} "
+                f"| {row.get('除权日', '-')} "
+                f"| {row.get('派息日', '-')} "
+                f"| {row.get('实施方案分红说明', '')} |"
+            )
+        lines.append("")
+        lines.append("## Note")
+        lines.append("- 送股/转增比例单位: 股/10股")
+        lines.append("- 派息比例单位: 元/10股(含税)")
+        lines.append("- 数据来源: 巨潮信息网(cninfo)")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("get_dividends_splits_ak error: %s", e)
+        return f"{_NO_DATA_PREFIX} 获取 '{ticker}' 分红送股数据失败:{e}"
 
 
-# ─── 新闻数据（东方财富搜索API + 财新网 + 央视新闻联播）─────────
+# ─── 财报披露日历 (stock_yysj_em) ──────────────────────────────
+
+def get_earnings_calendar_ak(ticker: str, curr_date: str | None = None) -> str:
+    """用东方财富财报预约披露时间替代 yfinance earnings calendar。
+
+    返回该股票最近几个报告期的财报预约/实际披露时间。
+    """
+    try:
+        import akshare as ak
+
+        code = _normalize_a_share_code(ticker)
+        if code is None:
+            return f"{_NO_DATA_PREFIX} 财报日历仅支持A股代码;got '{ticker}'."
+
+        # 构建最近6个报告期
+        if curr_date:
+            try:
+                curr = datetime.strptime(curr_date, "%Y-%m-%d")
+            except Exception:
+                curr = datetime.now()
+        else:
+            curr = datetime.now()
+
+        report_periods = []
+        for y in range(curr.year - 1, curr.year + 2):
+            for m, d in [(3, 31), (6, 30), (9, 30), (12, 31)]:
+                period = f"{y}{m:02d}{d:02d}"
+                if period <= curr.strftime("%Y%m%d"):
+                    report_periods.append(period)
+        report_periods = sorted(report_periods)[-6:]
+
+        results = []
+        for period in report_periods:
+            try:
+                df = ak.stock_yysj_em(symbol="沪深A股", date=period)
+                if df is not None and not df.empty:
+                    row = df[df["股票代码"] == code]
+                    if not row.empty:
+                        results.append((period, row.iloc[0]))
+            except Exception:
+                continue
+
+        if not results:
+            return f"{_NO_DATA_PREFIX} 未找到 '{ticker}' 的财报披露日历数据。"
+
+        lines = [
+            f"# Earnings Calendar for {ticker} (东方财富)",
+            f"# 数据源:akshare -> 东方财富",
+            f"# 报告期数: {len(results)}",
+            "",
+            "| 报告期 | 首次预约时间 | 变更日期 | 实际披露时间 |",
+            "|--------|-------------|---------|-------------|",
+        ]
+        for period, r in results:
+            first_date = str(r.get("首次预约时间", ""))
+            change1 = str(r.get("一次变更日期", ""))
+            change1 = "" if change1 == "NaT" else change1
+            actual = str(r.get("实际披露时间", ""))
+            actual = "" if actual == "NaT" else actual
+            # 报告期格式: 20251231 -> 2025年报
+            period_label = period
+            if period.endswith("0331"):
+                period_label = f"{period[:4]}年报"
+            elif period.endswith("0630"):
+                period_label = f"{period[:4]}半年报"
+            elif period.endswith("0930"):
+                period_label = f"{period[:4]}三季报"
+            elif period.endswith("1231"):
+                period_label = f"{period[:4]}业绩预告"
+            lines.append(f"| {period_label} | {first_date or '-'} | {change1 or '-'} | {actual or '-'} |")
+
+        lines.append("")
+        lines.append("## Note")
+        lines.append("- 0331=年报, 0630=半年报, 0930=三季报, 1231=业绩预告")
+        lines.append("- 实际披露时间为空表示尚未披露")
+        lines.append("- 数据来源: 东方财富网")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("get_earnings_calendar_ak error: %s", e)
+        return f"{_NO_DATA_PREFIX} 获取 '{ticker}' 财报日历数据失败:{e}"
+
+
+# ─── 机构/十大股东持仓 (stock_main_stock_holder) ────────────────
+
+def get_institutional_holders_ak(ticker: str, curr_date: str | None = None) -> str:
+    """用十大股东 + 基金持仓数据替代 yfinance institutional holders。
+
+    返回最新报告期的十大股东信息,以及持仓该股票的基金列表。
+    """
+    try:
+        import akshare as ak
+
+        code = _normalize_a_share_code(ticker)
+        if code is None:
+            return f"{_NO_DATA_PREFIX} 机构持仓数据仅支持A股代码;got '{ticker}'."
+
+        lines = [
+            f"# Institutional Holders for {ticker} (东方财富+巨潮)",
+            f"# 数据源:akshare",
+            "",
+        ]
+
+        # 第一部分:十大股东
+        try:
+            df = ak.stock_main_stock_holder(stock=code)
+            if df is not None and not df.empty:
+                # 按截至日期过滤
+                if curr_date and "截至日期" in df.columns:
+                    df["截至日期"] = df["截至日期"].astype(str)
+                    df = df[df["截至日期"] <= curr_date]
+
+                if not df.empty:
+                    latest_date = str(df.iloc[0].get("截至日期", ""))
+                    total_holders = str(df.iloc[0].get("股东总数", ""))
+                    avg_holding = str(df.iloc[0].get("平均持股数", ""))
+
+                    lines.append(f"## 十大股东 (截至 {latest_date})")
+                    lines.append(f"股东总数: {total_holders} | 平均持股: {avg_holding}")
+                    lines.append("")
+                    lines.append("| 序号 | 股东名称 | 持股数量 | 持股比例 | 股本性质 |")
+                    lines.append("|------|---------|---------|---------|---------|")
+                    for _, row in df.iterrows():
+                        lines.append(
+                            f"| {row.get('编号', '')} "
+                            f"| {row.get('股东名称', '')} "
+                            f"| {row.get('持股数量', '')} "
+                            f"| {row.get('持股比例', '')}% "
+                            f"| {row.get('股本性质', '')} |"
+                        )
+                    lines.append("")
+                else:
+                    lines.append(f"## 十大股东: {curr_date} 及之前无数据")
+                    lines.append("")
+            else:
+                lines.append("## 十大股东: 无数据")
+                lines.append("")
+        except Exception as e:
+            lines.append(f"## 十大股东: 获取失败 ({e})")
+            lines.append("")
+
+        # 第二部分:基金持仓
+        try:
+            df2 = ak.stock_fund_stock_holder(symbol=code)
+            if df2 is not None and not df2.empty:
+                # 按截止日期过滤
+                if curr_date and "截止日期" in df2.columns:
+                    df2["截止日期"] = df2["截止日期"].astype(str)
+                    df2 = df2[df2["截止日期"] <= curr_date]
+
+                if not df2.empty:
+                    df2 = df2.head(15)
+                    lines.append(f"## 基金持仓 (Top {len(df2)})")
+                    lines.append("")
+                    lines.append("| 基金名称 | 基金代码 | 持仓数量 | 占流通股比例 | 持股市值 | 截止日期 |")
+                    lines.append("|---------|---------|---------|------------|---------|---------|")
+                    for _, row in df2.iterrows():
+                        lines.append(
+                            f"| {row.get('基金名称', '')} "
+                            f"| {row.get('基金代码', '')} "
+                            f"| {row.get('持仓数量', '')} "
+                            f"| {row.get('占流通股比例', '')}% "
+                            f"| {row.get('持股市值', '')} "
+                            f"| {row.get('截止日期', '')} |"
+                        )
+                    lines.append("")
+                else:
+                    lines.append("## 基金持仓: 无数据")
+                    lines.append("")
+            else:
+                lines.append("## 基金持仓: 无数据")
+                lines.append("")
+        except Exception as e:
+            lines.append(f"## 基金持仓: 获取失败 ({e})")
+            lines.append("")
+
+        lines.append("## Note")
+        lines.append("- 十大股东数据来源: 巨潮信息网")
+        lines.append("- 基金持仓数据来源: 东方财富")
+        lines.append("- 持股比例为百分比,单位: %")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("get_institutional_holders_ak error: %s", e)
+        return f"{_NO_DATA_PREFIX} 获取 '{ticker}' 机构持仓数据失败:{e}"
+
+
+# ─── 高管增减持 (stock_share_hold_change) ────────────────────────
+
+def get_insider_transactions_ak(ticker: str, curr_date: str | None = None) -> str:
+    """用深交所/上交所高管股份变动数据替代 yfinance insider transactions。
+
+    返回近期董监高增减持记录,包含变动人、变动日期、变动数量、
+    成交均价、变动原因等信息。
+    """
+    try:
+        import akshare as ak
+
+        code = _normalize_a_share_code(ticker)
+        if code is None:
+            return f"{_NO_DATA_PREFIX} 高管交易数据仅支持A股代码;got '{ticker}'."
+
+        # 根据交易所选择接口
+        if code.startswith("6"):
+            # 沪市
+            df = ak.stock_share_hold_change_sse(symbol=code)
+        elif code.startswith("0") or code.startswith("3"):
+            # 深市
+            df = ak.stock_share_hold_change_szse(symbol=code)
+        elif code.startswith("8") or code.startswith("4"):
+            # 北交所 - 暂无专用接口
+            return f"{_NO_DATA_PREFIX} 北交所股票 '{ticker}' 暂不支持高管交易查询。"
+        else:
+            return f"{_NO_DATA_PREFIX} 无法识别股票 '{ticker}' 的交易所。"
+
+        if df is None or df.empty:
+            return f"{_NO_DATA_PREFIX} 未找到 '{ticker}' 的高管股份变动记录。"
+
+        # 日期过滤
+        date_col = None
+        for col in df.columns:
+            if "日期" in col or "date" in col.lower():
+                date_col = col
+                break
+        if date_col and curr_date:
+            df[date_col] = df[date_col].astype(str)
+            df = df[df[date_col] <= curr_date]
+
+        if df.empty:
+            return f"{_NO_DATA_PREFIX} '{ticker}' 在 {curr_date} 及之前无高管交易记录。"
+
+        df = df.head(30)
+
+        lines = [
+            f"# Insider Transactions for {ticker} (交易所披露)",
+            f"# 数据源:akshare -> 沪深交易所",
+            f"# 记录数: {len(df)}",
+            "",
+            "| 变动日期 | 姓名 | 变动数量(万股) | 成交均价 | 变动原因 | 职务 |",
+            "|---------|------|--------------|---------|---------|------|",
+        ]
+        for _, row in df.iterrows():
+            lines.append(
+                f"| {row.get('变动日期', row.get('日期', ''))} "
+                f"| {row.get('董监高姓名', row.get('股份变动人姓名', ''))} "
+                f"| {row.get('变动股份数量', '')} "
+                f"| {row.get('成交均价', '')} "
+                f"| {row.get('变动原因', '')} "
+                f"| {row.get('职务', '')} |"
+            )
+
+        lines.append("")
+        lines.append("## Note")
+        lines.append("- 变动数量为正表示增持,为负表示减持")
+        lines.append("- 成交均价单位: 元")
+        lines.append("- 数据来源: 沪深交易所披露")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("get_insider_transactions_ak error: %s", e)
+        return f"{_NO_DATA_PREFIX} 获取 '{ticker}' 高管交易数据失败:{e}"
+
+
+# ─── 融资融券 (stock_margin_detail) ──────────────────────────────
+
+def get_short_interest_ak(ticker: str, curr_date: str | None = None) -> str:
+    """用融资融券数据替代 yfinance short interest。
+
+    返回该股票的融资融券余额数据,包括融资余额、融券余量等。
+    仅融资融券标的股票有数据。
+    """
+    try:
+        import akshare as ak
+
+        code = _normalize_a_share_code(ticker)
+        if code is None:
+            return f"{_NO_DATA_PREFIX} 融资融券数据仅支持A股代码;got '{ticker}'."
+
+        # 沪市用 stock_margin_detail_sse,深市用 stock_margin_detail_szse
+        market = "沪市" if code.startswith("6") else ("深市" if code.startswith("0") or code.startswith("3") else "")
+        if not market:
+            return f"{_NO_DATA_PREFIX} 北交所股票 '{ticker}' 暂不支持融资融券查询。"
+
+        # 尝试获取最近30天的数据,找到最近一个交易日
+        end_dt = datetime.strptime(curr_date, "%Y-%m-%d") if curr_date else datetime.now()
+        results = []
+        for i in range(30):
+            check_date = end_dt - timedelta(days=i)
+            date_str = check_date.strftime("%Y%m%d")
+            try:
+                df = ak.stock_margin_detail_sse(date=date_str) if market == "沪市" else ak.stock_margin_detail_szse(date=date_str)
+                if df is not None and not df.empty:
+                    code_col = None
+                    for col in df.columns:
+                        if "代码" in col or "symbol" in col.lower():
+                            code_col = col
+                            break
+                    if code_col:
+                        row = df[df[code_col] == code]
+                        if not row.empty:
+                            results.append((date_str, row.iloc[0]))
+                            break  # 找到最近一个交易日即可
+            except Exception:
+                continue
+
+        if not results:
+            return f"{_NO_DATA_PREFIX} '{ticker}' 近期无融资融券数据(可能非融资融券标的)。"
+
+        date_str, row = results[0]
+        lines = [
+            f"# Short Interest / Margin Trading for {ticker} (交易所)",
+            f"# 数据源:akshare -> 沪深交易所",
+            f"# 日期: {date_str}",
+            "",
+        ]
+
+        # 输出所有可用字段
+        lines.append("## 最新交易日数据")
+        lines.append("")
+        for col in row.index:
+            val = row[col]
+            if pd.notna(val):
+                lines.append(f"- {col}: {val}")
+
+        lines.append("")
+        lines.append("## Note")
+        lines.append("- 融资余额: 投资者借入资金买入股票的余额")
+        lines.append("- 融券余量: 投资者借入股票卖出的余量")
+        lines.append("- 融资买入额/融券卖出量反映当日交易活跃度")
+        lines.append("- 非融资融券标的股票无数据")
+        lines.append("- 数据来源: 沪深交易所")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("get_short_interest_ak error: %s", e)
+        return f"{_NO_DATA_PREFIX} 获取 '{ticker}' 融资融券数据失败:{e}"
+
+
+# ─── 新闻数据(东方财富搜索API + 财新网 + 央视新闻联播)─────────
+
 
 def _fetch_eastmoney_news(code: str, page_size: int = 50) -> list[dict]:
-    """通过东方财富搜索 API 获取个股新闻（比 akshare.stock_news_em 的 10 条更多）。
+    """通过东方财富搜索 API 获取个股新闻(比 akshare.stock_news_em 的 10 条更多)。
 
-    直接调用 eastmoney search-api-web 接口，返回 JSON 列表。
+    直接调用 eastmoney search-api-web 接口,返回 JSON 列表。
     """
     import json
     import re
@@ -686,15 +1075,15 @@ def _fetch_eastmoney_news(code: str, page_size: int = 50) -> list[dict]:
 def fetch_news_ak(ticker: str, start_date: str, end_date: str) -> str:
     """用东方财富搜索 API + akshare stock_news_em 双源获取个股新闻。
 
-    优先使用东方财富搜索 API（可获取 50 条），回退到 akshare.stock_news_em（10 条）。
-    按日期范围过滤，超出范围的新闻不返回。
+    优先使用东方财富搜索 API(可获取 50 条),回退到 akshare.stock_news_em(10 条)。
+    按日期范围过滤,超出范围的新闻不返回。
     """
     from datetime import datetime as _dt
 
     code = _normalize_a_share_code(ticker)
     if code is None:
         return (
-            f"{_NO_DATA_PREFIX} News search only supports A-share tickers; "
+            f"{_NO_DATA_PREFIX} 新闻搜索仅支持A股代码;"
             f"got '{ticker}'."
         )
 
@@ -707,7 +1096,7 @@ def fetch_news_ak(ticker: str, start_date: str, end_date: str) -> str:
 
     articles = []
 
-    # 数据源 1: 东方财富搜索 API（50 条）
+    # 数据源 1: 东方财富搜索 API(50 条)
     try:
         raw_articles = _fetch_eastmoney_news(code, page_size=50)
         for a in raw_articles:
@@ -751,10 +1140,10 @@ def fetch_news_ak(ticker: str, start_date: str, end_date: str) -> str:
             logger.debug("stock_news_em fallback failed for %s: %s", code, exc)
 
     if not articles:
-        return f"{_NO_DATA_PREFIX} No news found for {ticker} from any source."
+        return f"{_NO_DATA_PREFIX} 未从任何数据源找到 {ticker} 的新闻。"
 
-    # 日期过滤：只保留 start_date ~ end_date 范围内的新闻
-    # 如果无法解析日期，则保留（宁多勿缺）
+    # 日期过滤:只保留 start_date ~ end_date 范围内的新闻
+    # 如果无法解析日期,则保留(宁多勿缺)
     filtered = []
     for a in articles:
         if a["dt"] is None:
@@ -764,11 +1153,11 @@ def fetch_news_ak(ticker: str, start_date: str, end_date: str) -> str:
         elif not start_dt or not end_dt:
             filtered.append(a)
 
-    # 如果日期过滤后为空，使用全部新闻（带提示）
+    # 如果日期过滤后为空,使用全部新闻(带提示)
     if not filtered:
         filtered = articles
         date_note = (
-            f" (注意: 未找到 {start_date} ~ {end_date} 范围内的新闻，"
+            f" (注意: 未找到 {start_date} ~ {end_date} 范围内的新闻,"
             f"以下为最近可用新闻)"
         )
     else:
@@ -796,8 +1185,8 @@ def fetch_news_ak(ticker: str, start_date: str, end_date: str) -> str:
 def get_global_news_ak(curr_date: str, look_back_days: int = 7, limit: int = 10) -> str:
     """用财新网 + 央视新闻联播双源替代 yfinance 全球新闻。
 
-    数据源 1: akshare.stock_news_main_cx（财新网，100 条最新财经新闻）
-    数据源 2: akshare.news_cctv（央视新闻联播文字版，逐日获取）
+    数据源 1: akshare.stock_news_main_cx(财新网,100 条最新财经新闻)
+    数据源 2: akshare.news_cctv(央视新闻联播文字版,逐日获取)
     """
     from datetime import datetime as _dt, timedelta as _td
 
@@ -806,7 +1195,7 @@ def get_global_news_ak(curr_date: str, look_back_days: int = 7, limit: int = 10)
         start_dt = curr_dt - _td(days=look_back_days)
     except Exception as exc:
         logger.debug("get_global_news_ak date parse failed", exc_info=True)
-        return f"[TOOL_ERROR] Failed to parse date for global news: {exc!s}"
+        return f"[TOOL_ERROR] 全局新闻日期解析失败:{exc!s}"
 
     all_news = []
 
@@ -822,12 +1211,12 @@ def get_global_news_ak(curr_date: str, look_back_days: int = 7, limit: int = 10)
                     "content": "",
                     "source": f"财新网-{row.get('tag', '')}",
                     "link": str(row.get("url", "")),
-                    "sort_key": 0,  # 财新新闻不知道日期，排前面
+                    "sort_key": 0,  # 财新新闻不知道日期,排前面
                 })
     except Exception as exc:
         logger.debug("stock_news_main_cx failed: %s", exc)
 
-    # 数据源 2: 央视新闻联播（按日期逐日获取）
+    # 数据源 2: 央视新闻联播(按日期逐日获取)
     try:
         import akshare as ak
         date_to_check = start_dt
@@ -853,11 +1242,11 @@ def get_global_news_ak(curr_date: str, look_back_days: int = 7, limit: int = 10)
 
     if not all_news:
         return (
-            f"{_NO_DATA_PREFIX} No global news found between "
+            f"{_NO_DATA_PREFIX} 未找到指定时间范围内的全局新闻:"
             f"{start_dt.strftime('%Y-%m-%d')} and {curr_date}."
         )
 
-    # 去重（按标题）
+    # 去重(按标题)
     seen = set()
     deduped = []
     for n in all_news:
@@ -912,10 +1301,10 @@ def _patch_module_bindings(mod, name_map):
 def apply_patch():
     """全面替换分析框架的数据层函数为 akshare 实现。
 
-    Patch 策略（三层）：
-    1. yfinance 模块层：替换框架内 `tradingagents.dataflows.yfinance` 模块属性
-    2. 工具模块层：通过 _patch_module_bindings() 替换已绑定的名字和 StructuredTool.func
-    3. dataflows.news 层：替换 fetch_news / get_global_news_yfinance 等
+    Patch 策略(三层):
+    1. yfinance 模块层:替换框架内 `tradingagents.dataflows.yfinance` 模块属性
+    2. 工具模块层:通过 _patch_module_bindings() 替换已绑定的名字和 StructuredTool.func
+    3. dataflows.news 层:替换 fetch_news / get_global_news_yfinance 等
     """
     import tradingagents.dataflows.yfinance as yf_mod
 
@@ -928,20 +1317,20 @@ def apply_patch():
     yf_mod.get_cashflow = get_cashflow_ak
     yf_mod.get_market_context = get_market_context_ak
 
-    # 不支持的功能 — 返回明确的 no-data 消息（不报错）
+    # 已适配的功能 - 用 akshare 数据源替代
     yf_mod.get_analyst_ratings = get_analyst_ratings_ak
-    yf_mod.get_earnings_calendar = _not_supported("get_earnings_calendar")
-    yf_mod.get_institutional_holders = _not_supported("get_institutional_holders")
-    yf_mod.get_insider_transactions = _not_supported("get_insider_transactions")
-    yf_mod.get_short_interest = _not_supported("get_short_interest")
-    yf_mod.get_dividends_splits = _not_supported("get_dividends_splits")
+    yf_mod.get_earnings_calendar = get_earnings_calendar_ak
+    yf_mod.get_institutional_holders = get_institutional_holders_ak
+    yf_mod.get_insider_transactions = get_insider_transactions_ak
+    yf_mod.get_short_interest = get_short_interest_ak
+    yf_mod.get_dividends_splits = get_dividends_splits_ak
 
     yf_mod._resolve_history_with_cache = _resolve_history_with_cache_ak
 
-    # ── 第二层：patch 工具模块中已绑定的名字 + StructuredTool.func ──
+    # ── 第二层:patch 工具模块中已绑定的名字 + StructuredTool.func ──
     try:
         import tradingagents.agents.utils.fundamental_data_tools as fd_tools
-        # 第一轮：patch _get_xxx 别名（plain function 绑定）
+        # 第一轮:patch _get_xxx 别名(plain function 绑定)
         _patch_module_bindings(fd_tools, {
             "_get_fundamentals": yf_mod.get_fundamentals,
             "_get_balance_sheet": yf_mod.get_balance_sheet,
@@ -952,7 +1341,7 @@ def apply_patch():
             "_get_short_interest": yf_mod.get_short_interest,
             "_get_dividends_splits": yf_mod.get_dividends_splits,
         })
-        # 第二轮：patch @tool 装饰的 StructuredTool 的 .func（不改模块属性，只修原对象）
+        # 第二轮:patch @tool 装饰的 StructuredTool 的 .func(不改模块属性,只修原对象)
         from langchain_core.tools import StructuredTool
         _tool_func_map = {
             "get_fundamentals": fd_tools._get_fundamentals,
@@ -1029,13 +1418,13 @@ def apply_patch():
         _patch_module_bindings(ti_tools, {
             "get_stock_stats_indicators_batch": yf_mod.get_stock_stats_indicators_batch,
         })
-        # 注意：不要替换 get_indicators 的 func！
-        # get_indicators 的签名是 indicator (单数 str)，内部会转换成 indicators 列表
+        # 注意:不要替换 get_indicators 的 func!
+        # get_indicators 的签名是 indicator (单数 str),内部会转换成 indicators 列表
         # 再调用 get_stock_stats_indicators_batch(symbol, indicators, ...)
         # _patch_module_bindings 已经把 ti_tools 模块里的 get_stock_stats_indicators_batch
-        # 引用替换成了 akshare 版本，所以 get_indicators 内部调用会正确走到 akshare 实现。
+        # 引用替换成了 akshare 版本,所以 get_indicators 内部调用会正确走到 akshare 实现。
         # 之前把 get_indicators.func 直接替换成 get_stock_stats_indicators_batch 导致
-        # 参数名不匹配 (indicator vs indicators)，LLM 传入 indicator=xxx 就报错了。
+        # 参数名不匹配 (indicator vs indicators),LLM 传入 indicator=xxx 就报错了。
         logger.info("  → technical_indicators_tools patched")
     except Exception as e:
         logger.warning("  → technical_indicators_tools patch skipped: %s", e)
@@ -1043,5 +1432,5 @@ def apply_patch():
     logger.info("akshare adapter fully applied")
 
 
-# 自动应用 patch（import 本模块即生效）
+# 自动应用 patch(import 本模块即生效)
 apply_patch()

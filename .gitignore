@@ -32,3 +32,9 @@ Thumbs.db
 
 # 日志
 *.log
+*.bak
+__pycache__/
+*.pyc
+nohup.out
+*.log
+*.tmp
